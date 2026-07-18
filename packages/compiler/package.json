@@ -1,0 +1,11 @@
+{
+  "name": "@visual-compiler/compiler",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "openai": "^6.10.0"
+  }
+}

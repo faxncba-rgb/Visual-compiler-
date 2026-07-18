@@ -1,0 +1,177 @@
+import { readFile } from "node:fs/promises";
+import { chromium, type Locator, type Page } from "playwright";
+import {
+  SemanticWorkflowSchema,
+  type SemanticStep,
+  type SemanticWorkflow,
+  type RuntimeTelemetry,
+} from "@visual-compiler/semantic-ir";
+
+export type RuntimeOptions = {
+  workflowPath: string;
+  url: string;
+  headless?: boolean;
+};
+
+async function resolveSemanticLocator(
+  page: Page,
+  step: SemanticStep,
+): Promise<Locator> {
+  const locator = step.selectedLocator;
+  if (!locator?.rule)
+    throw new Error(`Step ${step.id} is missing a semantic locator rule.`);
+  const rule = locator.rule;
+
+  if (rule.candidateText && rule.candidateRole) {
+    const direct = page.getByRole(rule.candidateRole, {
+      name: rule.candidateText,
+    });
+    if ((await direct.count()) > 0) return direct.first();
+  }
+
+  if (!rule.anchorText || !rule.candidateRole) {
+    throw new Error(`Step ${step.id} has insufficient locator data.`);
+  }
+
+  const anchor = page.getByText(rule.anchorText, { exact: true }).first();
+  const anchorBox = await anchor.boundingBox();
+  if (!anchorBox)
+    throw new Error(`Anchor text not visible: ${rule.anchorText}`);
+
+  const candidates = page.getByRole(rule.candidateRole);
+  const matches: Array<{
+    locator: Locator;
+    box: NonNullable<Awaited<ReturnType<Locator["boundingBox"]>>>;
+    distance: number;
+  }> = [];
+  const count = await candidates.count();
+  for (let i = 0; i < count; i += 1) {
+    const candidate = candidates.nth(i);
+    if (rule.visibleOnly && !(await candidate.isVisible())) continue;
+    if (rule.enabledOnly && !(await candidate.isEnabled())) continue;
+    const box = await candidate.boundingBox();
+    if (!box) continue;
+    const centerY = box.y + box.height / 2;
+    const anchorCenterY = anchorBox.y + anchorBox.height / 2;
+    const centerX = box.x + box.width / 2;
+    const anchorCenterX = anchorBox.x + anchorBox.width / 2;
+    const sameRow = Math.abs(centerY - anchorCenterY) <= 24;
+    const sameColumn = Math.abs(centerX - anchorCenterX) <= 34;
+    const relationOk =
+      (rule.relation === "right-of" &&
+        box.x >= anchorBox.x + anchorBox.width - 4 &&
+        sameRow) ||
+      (rule.relation === "left-of" &&
+        box.x + box.width <= anchorBox.x + 4 &&
+        sameRow) ||
+      (rule.relation === "below" &&
+        box.y >= anchorBox.y + anchorBox.height - 4) ||
+      (rule.relation === "above" && box.y + box.height <= anchorBox.y + 4) ||
+      (rule.relation === "same-row" && sameRow) ||
+      (rule.relation === "same-column" && sameColumn) ||
+      rule.relation === "nearest";
+    if (relationOk) {
+      matches.push({
+        locator: candidate,
+        box,
+        distance: Math.hypot(centerX - anchorCenterX, centerY - anchorCenterY),
+      });
+    }
+  }
+  if (matches.length === 0)
+    throw new Error(`No runtime locator match for step ${step.id}.`);
+  const ordered =
+    rule.relation === "right-of"
+      ? matches.sort((a, b) => a.box.x - b.box.x)
+      : matches.sort((a, b) => a.distance - b.distance);
+  const index = Math.max(0, (rule.ordinal ?? 1) - 1);
+  return ordered[index]?.locator ?? ordered[0].locator;
+}
+
+async function runStep(page: Page, step: SemanticStep) {
+  const target = await resolveSemanticLocator(page, step);
+  if (step.action === "check") await target.check();
+  else if (step.action === "uncheck") await target.uncheck();
+  else if (step.action === "click") await target.click();
+  else if (step.action === "fill") await target.fill(step.value ?? "");
+  else if (step.action === "wait") await target.waitFor({ state: "visible" });
+  else if (step.action === "assert") await target.waitFor({ state: "visible" });
+  else throw new Error(`Unsupported runtime action: ${step.action}`);
+
+  for (const assertion of step.postconditions) {
+    if (assertion.type === "text-visible") {
+      await page
+        .getByText(String(assertion.expected ?? assertion.target), {
+          exact: true,
+        })
+        .waitFor({ state: "visible" });
+    }
+    if (assertion.type === "checkbox-state") {
+      const checked = await target.isChecked();
+      if (checked !== assertion.expected)
+        throw new Error(
+          `Checkbox postcondition failed for ${assertion.target}.`,
+        );
+    }
+  }
+}
+
+export async function runWorkflowObject(
+  workflow: SemanticWorkflow,
+  url: string,
+  headless = true,
+): Promise<RuntimeTelemetry> {
+  const browser = await chromium.launch({ headless });
+  const page = await browser.newPage({ viewport: workflow.source.viewport });
+  let openAIRequests = 0;
+  await page.route("**/*", async (route) => {
+    const host = new URL(route.request().url()).host;
+    if (host.includes("openai.com")) openAIRequests += 1;
+    await route.continue();
+  });
+  const telemetry: RuntimeTelemetry = {
+    startedAt: new Date().toISOString(),
+    llmCalls: 0,
+    openAIRequests: 0,
+    steps: [],
+  };
+  const started = Date.now();
+  try {
+    await page.goto(url);
+    for (const step of workflow.steps) {
+      const stepStart = Date.now();
+      try {
+        await runStep(page, step);
+        telemetry.steps.push({
+          stepId: step.id,
+          action: step.action,
+          status: "passed",
+          durationMs: Date.now() - stepStart,
+        });
+      } catch (error) {
+        telemetry.steps.push({
+          stepId: step.id,
+          action: step.action,
+          status: "failed",
+          durationMs: Date.now() - stepStart,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+  telemetry.finishedAt = new Date().toISOString();
+  telemetry.durationMs = Date.now() - started;
+  telemetry.openAIRequests = openAIRequests as 0;
+  if (openAIRequests !== 0)
+    throw new Error(`Runtime made ${openAIRequests} OpenAI network requests.`);
+  return telemetry;
+}
+
+export async function runCompiledWorkflow(options: RuntimeOptions) {
+  const raw = await readFile(options.workflowPath, "utf8");
+  const workflow = SemanticWorkflowSchema.parse(JSON.parse(raw));
+  return runWorkflowObject(workflow, options.url, options.headless ?? true);
+}

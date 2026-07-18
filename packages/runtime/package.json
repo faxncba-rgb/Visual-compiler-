@@ -1,0 +1,12 @@
+{
+  "name": "@visual-compiler/runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "playwright": "^1.57.0",
+    "zod": "^4.1.13"
+  }
+}
