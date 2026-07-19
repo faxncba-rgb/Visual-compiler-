@@ -33,6 +33,13 @@
 - The Compose template publishes no host ports, requires an existing Traefik
   access-control middleware for Studio, and passes `OPENAI_API_KEY` only to the
   server-side Studio container.
+- The compiler now uses the Responses API Structured Outputs helper with a
+  strict Zod schema compatible with OpenAI's required-field rules, requests
+  `gpt-5.6` at medium reasoning effort, disables response storage, and records
+  the response model and token usage in diagnostics.
+- Local development commands load `.env` automatically. The current local file
+  is ignored by Git, has mode `0600`, and contains the expected live-compile
+  settings without exposing the credential to browser code or runtime.
 - No VPS deployment or GitHub push has been performed.
 
 ## Bugs Found and Fixed
@@ -47,6 +54,9 @@
   an isolated test output path.
 - The production-only install would have omitted `tsx`; it is now a production
   dependency and the npm lockfile records that classification.
+- The original interpreter schema used optional object properties, which strict
+  Structured Outputs rejects; the API-facing schema now uses required nullable
+  fields and strips null object fields before application validation.
 
 ## Verification Status
 
@@ -57,23 +67,29 @@
 - Matching Playwright Chromium 1228 for Playwright `1.61.1`: installed.
 - `npm run test:e2e`: passing, including layout variants A/B and an iPhone-sized
   Safari-user-agent Studio check.
+- Strict Structured Outputs schema test: passing and verifies that all generated
+  object schemas forbid additional properties and require every property.
+- Local GPT-5.6 attempt: the request reached OpenAI but was rejected before
+  generation with HTTP `429`, code `insufficient_quota`. No workflow artifact
+  was overwritten.
+- Deterministic local replay after that attempt: variants A and B both passed
+  with `llmCalls: 0` and `openAIRequests: 0`.
 - Compose YAML parse: passing.
 - Docker image build and `docker compose config`: not run because Docker is not
   installed in this workspace environment.
 
 ## Remaining External Verification
 
-- Build the image and run `docker compose config --quiet` on a Docker-capable
-  host before the first deployment.
-- Verify on physical iPhone Safari after DNS, HTTPS, and the existing Traefik
-  access-control middleware are configured.
-- Live GPT-5.6 compilation remains intentionally untested because no credential
-  was requested or used.
-- Follow `DEPLOYMENT.md` for user-controlled deployment, verification, update,
-  backup, and rollback. Deployment is explicitly out of scope for this milestone
-  run.
+- Enable billing or add credits to the OpenAI API project that owns the local
+  key, wait for the quota change to propagate, then rerun `npm run demo:live`.
+- After a successful live compile, inspect the saved diagnostics and rerun the
+  complete E2E suite against the newly generated artifact.
+- Docker image, Compose, physical iPhone, and VPS validation are retained only
+  as unvalidated future options and are not part of the current macOS milestone.
 
 ## Next Actions Requiring User Direction
 
-- Push the committed branch to GitHub only after explicit approval.
-- Deploy to the Hostinger VPS only in a separate, explicitly authorized step.
+- Confirm that API billing or credits are active for the project that owns the
+  key before another paid API attempt.
+- Push the branch to GitHub only after the local GPT-5.6 milestone is complete
+  and explicit approval is reconfirmed.

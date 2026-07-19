@@ -137,6 +137,8 @@ function studioHtml() {
       </div>
       <div style="margin-top:18px" aria-live="polite">
         <div class="metric"><span>Compile-time model calls</span><strong id="compileCalls">0</strong></div>
+        <div class="metric"><span>Compile response model</span><strong id="compileModel">-</strong></div>
+        <div class="metric"><span>Compile tokens (in / out)</span><strong id="compileTokens">-</strong></div>
         <div class="metric"><span>Runtime model calls</span><strong id="runtimeCalls">0</strong></div>
         <div class="metric"><span>Selected locator confidence</span><strong id="confidence">-</strong></div>
         <div class="metric"><span>Status</span><strong id="status" class="warn">Idle</strong></div>
@@ -187,6 +189,9 @@ function studioHtml() {
         const json = await requestJson("/api/compile", { instruction: document.getElementById("instruction").value, variant });
         state.workflow = json.workflow;
         document.getElementById("compileCalls").textContent = state.workflow.diagnostics.modelCalls;
+        document.getElementById("compileModel").textContent = state.workflow.diagnostics.responseModel ?? state.workflow.compileModel;
+        const usage = state.workflow.diagnostics.tokenUsage;
+        document.getElementById("compileTokens").textContent = usage ? usage.inputTokens + " / " + usage.outputTokens : "-";
         document.getElementById("confidence").textContent = Math.round(state.workflow.steps[0].selectedLocator.confidence * 100) + "%";
         setStatus("Compiled", "ok");
         render();

@@ -9,6 +9,11 @@ passed only to the server-side Studio service. It is never embedded in the
 Studio HTML, iframe URL, demo container, workflow artifact, or runtime
 telemetry.
 
+For local macOS development, `.env` is ignored by Git and should remain a plain
+text file with mode `0600`. Local development commands load it server-side; the
+live demonstration deletes `OPENAI_API_KEY` from its process environment before
+starting runtime replay and again during cleanup.
+
 The runtime package has no OpenAI dependency. Runtime-controlled browser
 requests to OpenAI hosts are aborted; any attempt fails the run. Successful
 runtime telemetry is possible only with `llmCalls: 0` and

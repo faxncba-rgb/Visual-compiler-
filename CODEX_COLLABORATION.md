@@ -17,6 +17,8 @@
 - Demo website and phone-width table interaction.
 - Page model extraction.
 - GPT-5.6 compile-time interpreter interface with strict JSON validation.
+- Responses API Structured Outputs integration with an API-compatible Zod
+  schema, response-model diagnostics, and token accounting.
 - Mock interpreter for offline tests.
 - Locator ranking, duplicate-anchor handling, and candidate diagnostics.
 - Generated Playwright source.
@@ -49,6 +51,9 @@
   Safari verification remains a deployment-stage check.
 - Docker is unavailable in this workspace, so the image and resolved Compose
   model must be validated on a Docker-capable host before deployment.
+- The local credential file is valid and protected, but the first real GPT-5.6
+  request was rejected by the API project with `insufficient_quota`; a generated
+  GPT-5.6 artifact therefore remains to be demonstrated.
 
 ## Bugs Found and Fixed with Codex
 
@@ -60,6 +65,8 @@
   scripts.
 - Removed the desktop-only three-column/mobile-overflow behavior from Studio.
 - Added client-visible request errors and disabled controls during compile/run.
+- Replaced optional Structured Outputs fields with required nullable fields and
+  added a recursive strict-schema regression test.
 
 ## Testing Generated or Improved with Codex
 
@@ -72,6 +79,7 @@
 - iPhone-sized Studio layout, touch target, iframe, and storage-health checks.
 - Deployment pin, internal/public URL, persistent-volume, and no-host-port
   assertions.
+- Strict OpenAI response-schema compatibility.
 
 ## GPT-5.6 Contribution at Compile Time
 
@@ -81,9 +89,10 @@ never imports or calls GPT-5.6.
 
 ## Milestone Handoff
 
-The `codex/vps-mobile-deployment` branch contains the completed deployment/mobile
-milestone. It has not been pushed or deployed. `DEPLOYMENT.md` is the operational
-handoff for a future explicitly authorized VPS session.
+The `codex/vps-mobile-deployment` branch contains the deployment/mobile milestone
+plus local GPT-5.6 integration improvements. It has not been pushed or deployed.
+Docker/VPS files are retained as an unvalidated option; the active handoff is
+local macOS validation after API quota is enabled.
 
 ## Feedback
 

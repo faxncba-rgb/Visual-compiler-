@@ -115,6 +115,15 @@ export const SemanticStepSchema = z.object({
 export const CompilationDiagnosticsSchema = z.object({
   modelCalls: z.number().int().min(0),
   interpretationSource: z.enum(["gpt-5.6", "mock", "precompiled-sample"]),
+  responseModel: z.string().optional(),
+  tokenUsage: z
+    .object({
+      inputTokens: z.number().int().min(0),
+      outputTokens: z.number().int().min(0),
+      reasoningTokens: z.number().int().min(0),
+      totalTokens: z.number().int().min(0),
+    })
+    .optional(),
   warnings: z.array(z.string()).default([]),
   durationMs: z.number().min(0),
   rejected: z.boolean().default(false),

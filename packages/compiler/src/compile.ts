@@ -91,6 +91,8 @@ export async function compileWorkflow(
     diagnostics: {
       modelCalls: interpretation.modelCalls,
       interpretationSource: interpretation.source,
+      responseModel: interpretation.responseModel,
+      tokenUsage: interpretation.tokenUsage,
       warnings: interpretation.result.ambiguityWarnings,
       durationMs: Date.now() - started,
       rejected: false,
@@ -118,6 +120,8 @@ export async function compileWorkflow(
 }
 
 export {
+  InterpreterResponseSchema,
+  interpreterResponseFormat,
   mockInterpretInstruction,
   interpretInstructionWithOpenAI,
 } from "./interpreter.js";

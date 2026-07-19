@@ -21,6 +21,34 @@ Runtime-only demo, no OpenAI key required:
 npm run demo:runtime
 ```
 
+## Local GPT-5.6 demo on macOS
+
+The local development commands load `.env` automatically. Create it as a plain
+text file and keep it readable only by your macOS account:
+
+```bash
+cp .env.example .env
+chmod 600 .env
+nano .env
+```
+
+In `nano`, save with `Control-O`, press `Return`, then exit with `Control-X`.
+Set `OPENAI_API_KEY`, `USE_LIVE_OPENAI=true`, and
+`OPENAI_COMPILE_MODEL=gpt-5.6`. Never paste the key into source code, a browser
+form, Git, or a support message.
+
+Run one real compilation followed by deterministic replay on variants A and B:
+
+```bash
+npm run demo:live
+```
+
+The command sends the page model and instruction to GPT-5.6 once, writes the
+validated workflow artifact, removes the API key from the process environment,
+then runs both variants with zero OpenAI calls. API billing or credits must be
+enabled for the API project that owns the key; a ChatGPT subscription does not
+provide API quota.
+
 ## Problem
 
 Browser agents often call a model at every click. That creates latency, cost, nondeterminism, privacy risk, and poor auditability. Traditional automation is deterministic, but it struggles with human spatial instructions like "check the first enabled checkbox to the right of Pending review."
@@ -104,7 +132,7 @@ store API keys, and runtime telemetry reports `llmCalls: 0`. The runtime also
 blocks browser requests to OpenAI hosts and fails the run if a page attempts one.
 This project is intended only for authorized browser automation.
 
-## Production deployment template
+## Optional, unvalidated deployment template
 
 The repository includes a production [Dockerfile](Dockerfile) and
 [Traefik-compatible Compose template](compose.production.yml). The image contains
@@ -118,7 +146,8 @@ Production keeps two URLs intentionally separate:
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for preparation, health verification,
 credential handling, safe updates, backups, and rollback. The template has not
-been deployed to a VPS.
+been validated with Docker or deployed to a VPS. Current work is intentionally
+limited to the local macOS demonstration.
 
 ## Limitations
 
