@@ -11,6 +11,14 @@ export type RuntimeOptions = {
   workflowPath: string;
   url: string;
   headless?: boolean;
+  slowMo?: number;
+  keepOpenMs?: number;
+};
+
+type RuntimeExecutionOptions = {
+  headless?: boolean;
+  slowMo?: number;
+  keepOpenMs?: number;
 };
 
 async function resolveSemanticLocator(
@@ -94,6 +102,8 @@ async function runStep(page: Page, step: SemanticStep) {
   else if (step.action === "uncheck") await target.uncheck();
   else if (step.action === "click") await target.click();
   else if (step.action === "fill") await target.fill(step.value ?? "");
+  else if (step.action === "select")
+    await target.selectOption(step.value ?? "");
   else if (step.action === "wait") await target.waitFor({ state: "visible" });
   else if (step.action === "assert") await target.waitFor({ state: "visible" });
   else throw new Error(`Unsupported runtime action: ${step.action}`);
@@ -116,19 +126,169 @@ async function runStep(page: Page, step: SemanticStep) {
   }
 }
 
+type FinalStateCheck = NonNullable<
+  RuntimeTelemetry["finalState"]
+>["checks"][number];
+
+function stepTargetName(step: SemanticStep) {
+  return (
+    step.target.accessibleName ??
+    step.selectedLocator?.rule?.candidateText ??
+    step.selectedLocator?.primary ??
+    step.intent
+  );
+}
+
+function passedCheck(
+  kind: FinalStateCheck["kind"],
+  target: string,
+  expected: string | boolean,
+  actual: string | boolean,
+): FinalStateCheck {
+  if (actual !== expected) {
+    throw new Error(
+      `Final state failed for ${kind} "${target}": expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}.`,
+    );
+  }
+  return { kind, target, expected, actual, passed: true };
+}
+
+async function verifyDerivedFinalState(page: Page, workflow: SemanticWorkflow) {
+  const checks: FinalStateCheck[] = [];
+  const statefulSteps = new Map<string, SemanticStep>();
+  for (const step of workflow.steps) {
+    if (["check", "uncheck", "fill", "select"].includes(step.action)) {
+      statefulSteps.set(stepTargetName(step), step);
+    }
+  }
+
+  for (const [targetName, step] of statefulSteps) {
+    const target = await resolveSemanticLocator(page, step);
+    if (step.action === "check" || step.action === "uncheck") {
+      checks.push(
+        passedCheck(
+          "checkbox-state",
+          targetName,
+          step.action === "check",
+          await target.isChecked(),
+        ),
+      );
+    }
+    if (step.action === "fill") {
+      checks.push(
+        passedCheck(
+          "input-value",
+          targetName,
+          step.value ?? "",
+          await target.inputValue(),
+        ),
+      );
+    }
+    if (step.action === "select") {
+      checks.push(
+        passedCheck(
+          "select-value",
+          targetName,
+          step.value ?? "",
+          await target.inputValue(),
+        ),
+      );
+    }
+  }
+
+  for (const step of workflow.steps) {
+    for (const assertion of step.postconditions) {
+      if (assertion.type === "text-visible") {
+        const expected = String(assertion.expected ?? assertion.target);
+        checks.push(
+          passedCheck(
+            "text-visible",
+            assertion.target,
+            true,
+            await page
+              .getByText(expected, { exact: true })
+              .first()
+              .isVisible()
+              .catch(() => false),
+          ),
+        );
+      }
+      if (assertion.type === "checkbox-state") {
+        const target = await resolveSemanticLocator(page, step);
+        checks.push(
+          passedCheck(
+            "checkbox-state",
+            assertion.target,
+            Boolean(assertion.expected),
+            await target.isChecked(),
+          ),
+        );
+      }
+      if (assertion.type === "element-visible") {
+        const target = await resolveSemanticLocator(page, step);
+        checks.push(
+          passedCheck(
+            "element-visible",
+            assertion.target,
+            Boolean(assertion.expected ?? true),
+            await target.isVisible(),
+          ),
+        );
+      }
+      if (assertion.type === "element-enabled") {
+        const target = await resolveSemanticLocator(page, step);
+        checks.push(
+          passedCheck(
+            "element-enabled",
+            assertion.target,
+            Boolean(assertion.expected ?? true),
+            await target.isEnabled(),
+          ),
+        );
+      }
+    }
+  }
+  return { checks };
+}
+
 export async function runWorkflowObject(
   workflow: SemanticWorkflow,
   url: string,
-  headless = true,
+  options: RuntimeExecutionOptions = {},
 ): Promise<RuntimeTelemetry> {
-  const browser = await chromium.launch({ headless });
-  const page = await browser.newPage({ viewport: workflow.source.viewport });
-  let openAIRequests = 0;
+  const headless = options.headless ?? true;
+  const keepOpenMs = Math.max(0, options.keepOpenMs ?? 0);
+  const browser = await chromium.launch({
+    headless,
+    slowMo: headless ? 0 : Math.max(0, options.slowMo ?? 0),
+  });
+  const page = await browser.newPage({
+    viewport: workflow.source.viewport,
+    serviceWorkers: "block",
+  });
+  let blockedOpenAIRequests = 0;
   await page.route("**/*", async (route) => {
-    const host = new URL(route.request().url()).host;
-    if (host.includes("openai.com")) openAIRequests += 1;
+    const hostname = new URL(route.request().url()).hostname.toLowerCase();
+    if (hostname === "openai.com" || hostname.endsWith(".openai.com")) {
+      blockedOpenAIRequests += 1;
+      await route.abort("blockedbyclient");
+      return;
+    }
     await route.continue();
   });
+  await page.routeWebSocket(
+    (candidateUrl) => {
+      const hostname = candidateUrl.hostname.toLowerCase();
+      return hostname === "openai.com" || hostname.endsWith(".openai.com");
+    },
+    async (webSocket) => {
+      blockedOpenAIRequests += 1;
+      await webSocket.close({
+        code: 1008,
+        reason: "OpenAI network access is disabled at runtime.",
+      });
+    },
+  );
   const telemetry: RuntimeTelemetry = {
     startedAt: new Date().toISOString(),
     llmCalls: 0,
@@ -159,19 +319,29 @@ export async function runWorkflowObject(
         throw error;
       }
     }
+    telemetry.finalState = await verifyDerivedFinalState(page, workflow);
+    if (!headless && keepOpenMs > 0) {
+      await page.waitForTimeout(keepOpenMs);
+    }
   } finally {
     await browser.close();
   }
   telemetry.finishedAt = new Date().toISOString();
   telemetry.durationMs = Date.now() - started;
-  telemetry.openAIRequests = openAIRequests as 0;
-  if (openAIRequests !== 0)
-    throw new Error(`Runtime made ${openAIRequests} OpenAI network requests.`);
+  if (blockedOpenAIRequests !== 0) {
+    throw new Error(
+      `Runtime blocked ${blockedOpenAIRequests} attempted OpenAI network request(s).`,
+    );
+  }
   return telemetry;
 }
 
 export async function runCompiledWorkflow(options: RuntimeOptions) {
   const raw = await readFile(options.workflowPath, "utf8");
   const workflow = SemanticWorkflowSchema.parse(JSON.parse(raw));
-  return runWorkflowObject(workflow, options.url, options.headless ?? true);
+  return runWorkflowObject(workflow, options.url, {
+    headless: options.headless,
+    slowMo: options.slowMo,
+    keepOpenMs: options.keepOpenMs,
+  });
 }

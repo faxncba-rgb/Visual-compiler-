@@ -7,7 +7,7 @@ export function generatePlaywrightSource(
 
 await runCompiledWorkflow({
   workflowPath: "compiled-workflows/${workflow.id}.json",
-  url: process.env.DEMO_SITE_URL ?? "${workflow.metadata.targetUrl}",
+  url: process.env.DEMO_SITE_INTERNAL_URL ?? process.env.DEMO_SITE_URL ?? "${workflow.metadata.targetUrl}",
   headless: false
 });
 `;

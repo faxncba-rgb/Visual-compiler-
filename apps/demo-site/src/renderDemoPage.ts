@@ -50,6 +50,7 @@ export function renderDemoPage(variant: DemoVariant) {
     <title>Visual Compiler Demo ${variant}</title>
     <style>
       :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      html { -webkit-text-size-adjust: 100%; }
       body { margin: 0; background: #f5f7fb; color: #172033; }
       main { max-width: 1080px; margin: 0 auto; padding: 28px; }
       header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
@@ -67,6 +68,7 @@ export function renderDemoPage(variant: DemoVariant) {
       .tone-neutral { background: #9aa6b2; }
       .tone-warning { background: #d79b28; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); border-radius: 2px; }
       table { width: 100%; border-collapse: collapse; }
+      .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       caption { text-align: left; font-weight: 700; padding: 14px 16px; color: #243044; }
       th, td { padding: 13px 16px; border-top: 1px solid #e3e9f4; text-align: left; vertical-align: middle; }
       th { color: #65738a; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
@@ -83,6 +85,17 @@ export function renderDemoPage(variant: DemoVariant) {
       .grid-b .icon-grid { grid-template-columns: 1fr 1fr; }
       .grid-b table td:nth-child(3), .grid-b table td:nth-child(4) { padding-left: 24px; }
       #result { margin-top: 14px; min-height: 22px; font-weight: 700; color: #146b43; }
+      @media (max-width: 760px) {
+        main { padding: 14px; }
+        header { align-items: flex-start; gap: 12px; }
+        h1 { font-size: 20px; }
+        .challenge-board { grid-template-columns: 1fr; }
+        .icon-grid, .grid-b .icon-grid { grid-template-columns: 1fr; }
+        table { min-width: 720px; }
+        button, input[type="checkbox"] { min-height: 44px; }
+        .confirm-zone { justify-content: stretch; }
+        .confirm { width: 100%; }
+      }
     </style>
   </head>
   <body>
@@ -100,13 +113,15 @@ export function renderDemoPage(variant: DemoVariant) {
               <div class="icon-card">${icon("red", "red status")}<span class="icon-label">Rejected request</span><input aria-label="Rejected request opt in" type="checkbox"></div>
             </div>
           </div>
-          <table aria-label="Requests table">
-            <caption>Requests table</caption>
-            <thead>
-              <tr><th>Document</th><th>Status text</th><th>Primary</th><th>Secondary</th><th>Action</th></tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
+          <div class="table-scroll" tabindex="0" aria-label="Scrollable requests table">
+            <table aria-label="Requests table">
+              <caption>Requests table</caption>
+              <thead>
+                <tr><th>Document</th><th>Status text</th><th>Primary</th><th>Secondary</th><th>Action</th></tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
           <div class="confirm-zone"><button class="confirm" aria-label="Confirm selection">Confirm selection</button></div>
           <div class="panel-inner"><div id="result" role="status" aria-live="polite"></div></div>
         </div>

@@ -1,7 +1,7 @@
 {
   "id": "pending-review.workflow",
   "version": "0.1.0",
-  "name": "Pending review approval",
+  "name": "Select first enabled option for the first Pending review table row and confirm",
   "source": {
     "url": "http://127.0.0.1:4173/demo?variant=A",
     "viewport": {
@@ -13,90 +13,130 @@
     {
       "id": "step-1",
       "action": "check",
-      "intent": "Check the first enabled checkbox to the right of the Pending review status text.",
+      "intent": "Check the first enabled checkbox to the right of the Pending review status in the first matching table row.",
       "target": {
+        "elementType": "checkbox",
         "role": "checkbox",
+        "accessibleName": "Insurance document primary checkbox",
+        "anchorText": "Pending review",
         "ordinal": 1,
-        "state": "enabled",
+        "state": "unchecked",
         "relations": [
+          {
+            "relation": "same-row",
+            "anchorText": "Pending review",
+            "anchorRole": "cell",
+            "tolerancePx": 30
+          },
           {
             "relation": "right-of",
             "anchorText": "Pending review",
-            "tolerancePx": 24
-          }
-        ]
-      },
-      "preconditions": [
-        {
-          "type": "element-enabled",
-          "target": "Pending review row checkbox",
-          "expected": true
-        }
-      ],
-      "postconditions": [
-        {
-          "type": "checkbox-state",
-          "target": "Pending review row checkbox",
-          "expected": true
-        }
-      ],
-      "candidates": [
-        {
-          "strategy": "spatial-bounds",
-          "selector": "checkbox right-of \"Pending review\" nth=1",
-          "confidence": 0.9,
-          "unique": true,
-          "stability": 0.82,
-          "explanation": "Deterministic geometry: checkbox right-of anchor text \"Pending review\".",
-          "fallbackOrder": 0
-        }
-      ],
-      "selectedLocator": {
-        "kind": "semantic-rule",
-        "primary": "checkbox right-of \"Pending review\" nth=1",
-        "fallback": "role=checkbox",
-        "rule": {
-          "anchorText": "Pending review",
-          "candidateRole": "checkbox",
-          "relation": "right-of",
-          "ordinal": 1,
-          "enabledOnly": true,
-          "visibleOnly": true
-        },
-        "confidence": 0.9,
-        "explanation": "Deterministic geometry resolves the first enabled checkbox to the right of the visible status text."
-      }
-    },
-    {
-      "id": "step-2",
-      "action": "click",
-      "intent": "Click the green confirmation button below the requests table.",
-      "target": {
-        "role": "button",
-        "accessibleName": "Confirm selection",
-        "iconColor": "green",
-        "relations": [
+            "anchorRole": "cell",
+            "tolerancePx": 30
+          },
           {
-            "relation": "below",
-            "anchorText": "Requests table",
-            "tolerancePx": 40
+            "relation": "same-row",
+            "anchorText": "Insurance document",
+            "anchorRole": "cell",
+            "tolerancePx": 30
+          },
+          {
+            "relation": "first",
+            "anchorText": "Pending review",
+            "anchorRole": "cell",
+            "tolerancePx": 70
           }
         ]
       },
       "preconditions": [
         {
           "type": "element-visible",
-          "target": "Confirm selection",
+          "target": "Insurance document primary checkbox",
           "expected": true
+        },
+        {
+          "type": "element-enabled",
+          "target": "Insurance document primary checkbox",
+          "expected": true
+        },
+        {
+          "type": "checkbox-state",
+          "target": "Insurance document primary checkbox",
+          "expected": false
         }
       ],
       "postconditions": [
         {
-          "type": "text-visible",
-          "target": "Compiled workflow completed",
-          "expected": "Compiled workflow completed"
+          "type": "checkbox-state",
+          "target": "Insurance document primary checkbox",
+          "expected": true
         }
       ],
+      "candidates": [
+        {
+          "strategy": "role-name",
+          "selector": "role=checkbox[name=\"Insurance document primary checkbox\"]",
+          "confidence": 0.96,
+          "unique": true,
+          "stability": 0.95,
+          "explanation": "Stable accessibility role and name.",
+          "fallbackOrder": 0
+        }
+      ],
+      "selectedLocator": {
+        "kind": "semantic-rule",
+        "primary": "role=checkbox[name=\"Insurance document primary checkbox\"]",
+        "rule": {
+          "anchorText": "Pending review",
+          "candidateRole": "checkbox",
+          "candidateText": "Insurance document primary checkbox",
+          "relation": "same-row",
+          "ordinal": 1,
+          "enabledOnly": false,
+          "visibleOnly": true
+        },
+        "confidence": 0.96,
+        "explanation": "Stable accessibility role and name."
+      }
+    },
+    {
+      "id": "step-2",
+      "action": "click",
+      "intent": "Activate the confirmation control below the Requests table.",
+      "target": {
+        "elementType": "button",
+        "role": "button",
+        "accessibleName": "Confirm selection",
+        "anchorText": "Requests table",
+        "iconColor": "green",
+        "state": "enabled",
+        "relations": [
+          {
+            "relation": "below",
+            "anchorText": "Requests table",
+            "anchorRole": "table",
+            "tolerancePx": 80
+          }
+        ]
+      },
+      "preconditions": [
+        {
+          "type": "checkbox-state",
+          "target": "Insurance document primary checkbox",
+          "expected": true
+        },
+        {
+          "type": "element-visible",
+          "target": "Confirm selection",
+          "expected": true
+        },
+        {
+          "type": "element-enabled",
+          "target": "Confirm selection",
+          "expected": true
+        }
+      ],
+      "postconditions": [],
       "candidates": [
         {
           "strategy": "role-name",
@@ -126,8 +166,8 @@
       }
     }
   ],
-  "generatedPlaywright": "import { runCompiledWorkflow } from \"@visual-compiler/runtime\";\n\nawait runCompiledWorkflow({\n  workflowPath: \"compiled-workflows/pending-review.workflow.json\",\n  url: process.env.DEMO_SITE_URL ?? \"http://127.0.0.1:4173/demo?variant=A\",\n  headless: false\n});\n",
-  "compiledAt": "2026-07-18T00:00:00.000Z",
+  "generatedPlaywright": "import { runCompiledWorkflow } from \"@visual-compiler/runtime\";\n\nawait runCompiledWorkflow({\n  workflowPath: \"compiled-workflows/pending-review.workflow.json\",\n  url: process.env.DEMO_SITE_INTERNAL_URL ?? process.env.DEMO_SITE_URL ?? \"http://127.0.0.1:4173/demo?variant=A\",\n  headless: false\n});\n",
+  "compiledAt": "2026-07-19T17:07:25.483Z",
   "compileModel": "gpt-5.6",
   "metadata": {
     "compilerVersion": "0.1.0",
@@ -136,11 +176,19 @@
   },
   "diagnostics": {
     "modelCalls": 1,
-    "interpretationSource": "precompiled-sample",
+    "interpretationSource": "gpt-5.6",
+    "responseModel": "gpt-5.6-sol",
+    "tokenUsage": {
+      "inputTokens": 5609,
+      "outputTokens": 733,
+      "reasoningTokens": 176,
+      "totalTokens": 6342
+    },
     "warnings": [
-      "Precompiled artifact included for runtime-only judging without an API key."
+      "The Requests table contains two rows with status “Pending review”: Insurance document and Vendor proof. This workflow resolves the ambiguity by choosing the first matching row in table order.",
+      "The page model does not expose a color for the “Confirm selection” button, so its identity is inferred from its accessible name and position below the table."
     ],
-    "durationMs": 0,
+    "durationMs": 11821,
     "rejected": false
   }
 }

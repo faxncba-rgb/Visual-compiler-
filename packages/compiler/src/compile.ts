@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { link, mkdir, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { chromium } from "playwright";
 import { extractPageModel } from "@visual-compiler/page-model";
@@ -19,13 +20,40 @@ export type CompileOptions = {
   instruction: string;
   url: string;
   outPath?: string;
+  outDir?: string;
   headless?: boolean;
+  interpreter?: typeof interpretInstruction;
 };
+
+export function createWorkflowIdentity(
+  instruction: string,
+  suffix = randomUUID().replaceAll("-", "").slice(0, 8),
+) {
+  const normalized = instruction.trim().replace(/\s+/g, " ");
+  const slug =
+    normalized
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 52)
+      .replace(/-+$/g, "") || "workflow";
+  const title = normalized.slice(0, 96).trim() || "Workflow";
+  return {
+    id: `${slug}-${suffix}`,
+    name: `${title} [${suffix}]`,
+  };
+}
 
 export async function compileWorkflow(
   options: CompileOptions,
 ): Promise<SemanticWorkflow> {
+  if (options.outPath && options.outDir) {
+    throw new Error("Specify either outPath or outDir, not both.");
+  }
   const started = Date.now();
+  const identity = createWorkflowIdentity(options.instruction);
   const browser = await chromium.launch({ headless: options.headless ?? true });
   const page = await browser.newPage({
     viewport: { width: 1280, height: 820 },
@@ -34,7 +62,7 @@ export async function compileWorkflow(
   const pageModel = await extractPageModel(page);
   await browser.close();
 
-  const interpretation = await interpretInstruction(
+  const interpretation = await (options.interpreter ?? interpretInstruction)(
     options.instruction,
     pageModel,
   );
@@ -50,7 +78,14 @@ export async function compileWorkflow(
         fallback: candidates[1]?.selector,
         rule: {
           anchorText: step.target.relations[0]?.anchorText,
-          candidateRole: step.target.role as "checkbox" | "button" | undefined,
+          candidateRole: step.target.role as
+            | "checkbox"
+            | "button"
+            | "textbox"
+            | "combobox"
+            | "option"
+            | "link"
+            | undefined,
           candidateText: step.target.accessibleName,
           relation:
             step.target.relations[0]?.relation === "next-to"
@@ -75,9 +110,9 @@ export async function compileWorkflow(
   });
 
   const workflowWithoutCode = {
-    id: "pending-review.workflow",
+    id: identity.id,
     version: "0.1.0",
-    name: interpretation.result.name,
+    name: identity.name,
     source: { url: options.url, viewport: pageModel.viewport },
     steps,
     compiledAt: nowIso(),
@@ -85,11 +120,14 @@ export async function compileWorkflow(
     metadata: {
       compilerVersion: "0.1.0",
       targetUrl: options.url,
-      validationVariant: "A",
+      validationVariant:
+        new URL(options.url).searchParams.get("variant") ?? undefined,
     },
     diagnostics: {
       modelCalls: interpretation.modelCalls,
       interpretationSource: interpretation.source,
+      responseModel: interpretation.responseModel,
+      tokenUsage: interpretation.tokenUsage,
       warnings: interpretation.result.ambiguityWarnings,
       durationMs: Date.now() - started,
       rejected: false,
@@ -100,14 +138,35 @@ export async function compileWorkflow(
     generatedPlaywright: generatePlaywrightSource(workflowWithoutCode),
   });
 
-  if (options.outPath) {
-    await mkdir(path.dirname(options.outPath), { recursive: true });
-    await writeFile(options.outPath, JSON.stringify(workflow, null, 2));
+  const artifactPath = options.outDir
+    ? path.join(options.outDir, `${workflow.id}.json`)
+    : options.outPath;
+  if (artifactPath) {
+    await mkdir(path.dirname(artifactPath), { recursive: true });
+    const temporaryPath = path.join(
+      path.dirname(artifactPath),
+      `${path.basename(artifactPath)}.${randomUUID()}.tmp.json`,
+    );
+    try {
+      await writeFile(temporaryPath, JSON.stringify(workflow, null, 2));
+      try {
+        await link(temporaryPath, artifactPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+          throw new Error(`Workflow artifact already exists: ${artifactPath}`);
+        }
+        throw error;
+      }
+    } finally {
+      await rm(temporaryPath, { force: true });
+    }
   }
   return workflow;
 }
 
 export {
+  InterpreterResponseSchema,
+  interpreterResponseFormat,
   mockInterpretInstruction,
   interpretInstructionWithOpenAI,
 } from "./interpreter.js";

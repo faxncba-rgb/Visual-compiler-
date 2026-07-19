@@ -8,8 +8,9 @@ flowchart TD
   Interpret --> IR[Validated Semantic IR]
   IR --> Locate[Locator candidate generation]
   Locate --> Validate[Rank and reject fragile locators]
-  Validate --> Artifact[Saved workflow JSON + generated Playwright]
-  Artifact --> Runtime[Playwright runtime]
+  Validate --> Artifact[New versioned workflow JSON + generated Playwright]
+  Artifact --> Registry[Studio artifact selector]
+  Registry --> Runtime[Playwright runtime]
   Runtime --> Telemetry[Assertions + telemetry: llmCalls=0]
 ```
 
@@ -20,6 +21,35 @@ The compiler package may import the OpenAI SDK. It converts natural language and
 ## Runtime Boundary
 
 The runtime package imports Playwright and Zod only. It loads a compiled workflow, resolves semantic locator rules against the live page, executes actions, and verifies postconditions. It never imports OpenAI and does not require `OPENAI_API_KEY`.
+
+Runtime-controlled browser traffic to `openai.com` and its subdomains is aborted.
+An attempted request fails the workflow instead of being sent. Successful
+telemetry therefore preserves both `llmCalls: 0` and `openAIRequests: 0`.
+
+## Artifact Boundary
+
+Every successful compilation derives a workflow name and id from the
+instruction, adds a short uniqueness suffix, and creates a new JSON file with an
+exclusive no-overwrite operation. Studio lists these files and passes the
+selected id to the runtime. Visible final-state evidence is derived from the
+selected workflow's state-changing actions, locators, and postconditions rather
+than a demo-specific target.
+
+## Production Topology
+
+```mermaid
+flowchart LR
+  Safari[iPhone Safari] -->|HTTPS| Traefik
+  Traefik --> Studio[Studio service]
+  Traefik --> DemoPublic[Demo service]
+  Studio -->|internal HTTP only| DemoPublic
+  Studio --> Volume[(Compiled workflow volume)]
+  Studio -. compile time only .-> OpenAI[OpenAI API]
+```
+
+The public iframe URL and internal Playwright URL are independent configuration
+values. Only Studio receives an optional OpenAI credential. The demo service,
+compiled artifacts, client HTML, and runtime telemetry never receive it.
 
 ## Locator Ranking
 

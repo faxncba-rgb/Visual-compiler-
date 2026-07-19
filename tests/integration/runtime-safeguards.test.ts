@@ -8,6 +8,9 @@ describe("runtime safeguards", () => {
     const source = await readFile("packages/runtime/src/index.ts", "utf8");
     expect(source).not.toMatch(/from ["']openai["']/);
     expect(source).not.toMatch(/new OpenAI/);
+    expect(source).toContain('serviceWorkers: "block"');
+    expect(source).toContain('await route.abort("blockedbyclient")');
+    expect(source).toContain("await page.routeWebSocket(");
   });
 
   it("runtime package has no OpenAI dependency", async () => {
@@ -17,21 +20,33 @@ describe("runtime safeguards", () => {
     expect(JSON.stringify(pkg.dependencies ?? {})).not.toContain("openai");
   });
 
+  it("derives replay checks without a hard-coded Pending review target", async () => {
+    const studio = await readFile("apps/studio/backend/src/server.ts", "utf8");
+    const runtime = await readFile("packages/runtime/src/index.ts", "utf8");
+    expect(studio).not.toContain("Insurance document primary checkbox");
+    expect(runtime).not.toContain("Insurance document primary checkbox");
+    expect(studio).toContain("outDir: WORKFLOW_STORAGE_DIR");
+    expect(studio).not.toContain("outPath: WORKFLOW_PATH");
+    expect(runtime).toContain("verifyDerivedFinalState");
+  });
+
   it("can run with OPENAI_API_KEY unset at process level", () => {
     delete process.env.OPENAI_API_KEY;
     expect(process.env.OPENAI_API_KEY).toBeUndefined();
     expect(existsSync("packages/runtime/src/index.ts")).toBe(true);
   });
 
-  it("ships a validated precompiled runtime artifact", async () => {
+  it("ships the validated GPT-5.6 runtime artifact without credentials", async () => {
     const raw = await readFile(
       "compiled-workflows/pending-review.workflow.json",
       "utf8",
     );
     const workflow = SemanticWorkflowSchema.parse(JSON.parse(raw));
-    expect(workflow.diagnostics.interpretationSource).toBe(
-      "precompiled-sample",
-    );
+    expect(raw).not.toMatch(/sk-[A-Za-z0-9_-]{20,}/);
+    expect(workflow.diagnostics.interpretationSource).toBe("gpt-5.6");
+    expect(workflow.diagnostics.modelCalls).toBe(1);
+    expect(workflow.diagnostics.responseModel).toBe("gpt-5.6-sol");
+    expect(workflow.diagnostics.tokenUsage?.totalTokens).toBeGreaterThan(0);
     expect(workflow.steps[0].selectedLocator?.rule?.candidateRole).toBe(
       "checkbox",
     );

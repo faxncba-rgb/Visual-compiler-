@@ -68,17 +68,22 @@ export function generateCandidates(
 
   if (relation?.anchorText) {
     const anchors = findTextNodes(model, relation.anchorText);
-    const anchor = readingOrder(anchors).find(Boolean);
-    if (!anchor) return [];
     const normalizedRelation =
       relation.relation === "next-to" ||
       relation.relation === "first" ||
       relation.relation === "second"
         ? "nearest"
         : relation.relation;
-    const related = filterByRelation(anchor.box, nodes, normalizedRelation, {
-      rowTolerance: relation.tolerancePx,
-    }).filter((node) => node.enabled || step.target.state !== "enabled");
+    const anchorMatch = readingOrder(anchors)
+      .map((anchor) => ({
+        anchor,
+        related: filterByRelation(anchor.box, nodes, normalizedRelation, {
+          rowTolerance: relation.tolerancePx,
+        }).filter((node) => node.enabled || step.target.state !== "enabled"),
+      }))
+      .find(({ related }) => related.length > 0);
+    if (!anchorMatch) return [];
+    const { related } = anchorMatch;
     const ordered =
       relation.relation === "right-of"
         ? [...related].sort((a, b) => a.box.x - b.box.x)

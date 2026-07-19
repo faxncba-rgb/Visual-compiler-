@@ -12,6 +12,16 @@ const model: PageModel = {
   capturedAt: new Date().toISOString(),
   nodes: [
     {
+      id: "unrelated-text",
+      tagName: "label",
+      text: "Pending review",
+      accessibleName: "Pending review",
+      visible: true,
+      enabled: true,
+      box: { x: 500, y: 20, width: 200, height: 20 },
+      attributes: {},
+    },
+    {
       id: "text",
       tagName: "span",
       text: "Pending review",
@@ -75,7 +85,7 @@ const step: SemanticStep = {
 };
 
 describe("locator engine", () => {
-  it("excludes disabled targets and selects the first enabled right-of target", () => {
+  it("skips unrelated duplicate anchors and selects the first enabled right-of target", () => {
     const candidates = generateCandidates(model, step);
     expect(candidates.map((candidate) => candidate.node?.id)).toEqual([
       "enabled",

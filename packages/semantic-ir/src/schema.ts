@@ -115,6 +115,15 @@ export const SemanticStepSchema = z.object({
 export const CompilationDiagnosticsSchema = z.object({
   modelCalls: z.number().int().min(0),
   interpretationSource: z.enum(["gpt-5.6", "mock", "precompiled-sample"]),
+  responseModel: z.string().optional(),
+  tokenUsage: z
+    .object({
+      inputTokens: z.number().int().min(0),
+      outputTokens: z.number().int().min(0),
+      reasoningTokens: z.number().int().min(0),
+      totalTokens: z.number().int().min(0),
+    })
+    .optional(),
   warnings: z.array(z.string()).default([]),
   durationMs: z.number().min(0),
   rejected: z.boolean().default(false),
@@ -126,6 +135,26 @@ export const RuntimeTelemetrySchema = z.object({
   durationMs: z.number().min(0).optional(),
   llmCalls: z.literal(0),
   openAIRequests: z.literal(0),
+  finalState: z
+    .object({
+      checks: z.array(
+        z.object({
+          kind: z.enum([
+            "checkbox-state",
+            "input-value",
+            "select-value",
+            "text-visible",
+            "element-visible",
+            "element-enabled",
+          ]),
+          target: z.string(),
+          expected: z.union([z.string(), z.boolean()]),
+          actual: z.union([z.string(), z.boolean()]),
+          passed: z.literal(true),
+        }),
+      ),
+    })
+    .optional(),
   steps: z.array(
     z.object({
       stepId: z.string(),
