@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { interpreterResponseFormat } from "@visual-compiler/compiler";
+import {
+  interpreterResponseFormat,
+  mockInterpretInstruction,
+} from "@visual-compiler/compiler";
+import { DEFAULT_INSTRUCTION } from "@visual-compiler/shared";
 
 function expectStrictObjects(schema: unknown): void {
   if (!schema || typeof schema !== "object") return;
@@ -21,5 +25,14 @@ describe("GPT-5.6 interpreter response format", () => {
     expect(interpreterResponseFormat.type).toBe("json_schema");
     expect(interpreterResponseFormat.strict).toBe(true);
     expectStrictObjects(interpreterResponseFormat.schema);
+  });
+
+  it("limits the offline mock to the documented fixture instruction", () => {
+    expect(mockInterpretInstruction(DEFAULT_INSTRUCTION).steps).toHaveLength(2);
+    expect(() =>
+      mockInterpretInstruction(
+        "Check the Invoice packet primary checkbox and confirm.",
+      ),
+    ).toThrow(/supports only the documented Pending review fixture/);
   });
 });

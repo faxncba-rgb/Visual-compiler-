@@ -37,3 +37,15 @@ Compiled workflows are written atomically to a configurable directory backed by
 a named Docker volume. Runtime retains no OpenAI package dependency, rejects
 attempted OpenAI browser traffic, and returns successful telemetry only when
 both model and OpenAI request counts are zero.
+
+## ADR-005: Version Compilations Instead of Replacing Artifacts
+
+Date: 2026-07-19
+
+Status: Accepted
+
+Each successful compilation creates a new artifact with an
+instruction-derived slug and a short random suffix. Final publication uses an
+exclusive filesystem operation, so an existing artifact cannot be replaced even
+if an id collision occurs. Studio lists and executes the explicitly selected
+artifact. The validated GPT-5.6 reference artifact remains immutable.

@@ -1,10 +1,11 @@
 import { createDemoServer } from "../apps/demo-site/src/server.js";
+import path from "node:path";
 import { compileWorkflow } from "@visual-compiler/compiler";
 import { runCompiledWorkflow } from "@visual-compiler/runtime";
 import {
   DEFAULT_DEMO_INTERNAL_URL,
   DEFAULT_INSTRUCTION,
-  WORKFLOW_PATH,
+  WORKFLOW_STORAGE_DIR,
 } from "@visual-compiler/shared";
 
 if (process.env.USE_LIVE_OPENAI !== "true") {
@@ -19,9 +20,10 @@ try {
   const workflow = await compileWorkflow({
     instruction: DEFAULT_INSTRUCTION,
     url: `${DEFAULT_DEMO_INTERNAL_URL}/demo?variant=A`,
-    outPath: WORKFLOW_PATH,
+    outDir: WORKFLOW_STORAGE_DIR,
     headless: true,
   });
+  const workflowPath = path.join(WORKFLOW_STORAGE_DIR, `${workflow.id}.json`);
 
   delete process.env.OPENAI_API_KEY;
   process.env.USE_LIVE_OPENAI = "false";
@@ -30,7 +32,7 @@ try {
     (["A", "B"] as const).map(async (variant) => ({
       variant,
       telemetry: await runCompiledWorkflow({
-        workflowPath: WORKFLOW_PATH,
+        workflowPath,
         url: `${DEFAULT_DEMO_INTERNAL_URL}/demo?variant=${variant}`,
         headless: true,
       }),
@@ -46,7 +48,7 @@ try {
           requestedModel: workflow.compileModel,
           responseModel: workflow.diagnostics.responseModel,
           tokenUsage: workflow.diagnostics.tokenUsage,
-          workflowPath: WORKFLOW_PATH,
+          workflowPath,
         },
         runtime: variants.map(({ variant, telemetry }) => ({
           variant,

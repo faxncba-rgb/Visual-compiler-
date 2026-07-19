@@ -20,6 +20,16 @@ describe("runtime safeguards", () => {
     expect(JSON.stringify(pkg.dependencies ?? {})).not.toContain("openai");
   });
 
+  it("derives replay checks without a hard-coded Pending review target", async () => {
+    const studio = await readFile("apps/studio/backend/src/server.ts", "utf8");
+    const runtime = await readFile("packages/runtime/src/index.ts", "utf8");
+    expect(studio).not.toContain("Insurance document primary checkbox");
+    expect(runtime).not.toContain("Insurance document primary checkbox");
+    expect(studio).toContain("outDir: WORKFLOW_STORAGE_DIR");
+    expect(studio).not.toContain("outPath: WORKFLOW_PATH");
+    expect(runtime).toContain("verifyDerivedFinalState");
+  });
+
   it("can run with OPENAI_API_KEY unset at process level", () => {
     delete process.env.OPENAI_API_KEY;
     expect(process.env.OPENAI_API_KEY).toBeUndefined();

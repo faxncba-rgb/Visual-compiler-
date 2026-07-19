@@ -8,8 +8,9 @@ flowchart TD
   Interpret --> IR[Validated Semantic IR]
   IR --> Locate[Locator candidate generation]
   Locate --> Validate[Rank and reject fragile locators]
-  Validate --> Artifact[Saved workflow JSON + generated Playwright]
-  Artifact --> Runtime[Playwright runtime]
+  Validate --> Artifact[New versioned workflow JSON + generated Playwright]
+  Artifact --> Registry[Studio artifact selector]
+  Registry --> Runtime[Playwright runtime]
   Runtime --> Telemetry[Assertions + telemetry: llmCalls=0]
 ```
 
@@ -24,6 +25,15 @@ The runtime package imports Playwright and Zod only. It loads a compiled workflo
 Runtime-controlled browser traffic to `openai.com` and its subdomains is aborted.
 An attempted request fails the workflow instead of being sent. Successful
 telemetry therefore preserves both `llmCalls: 0` and `openAIRequests: 0`.
+
+## Artifact Boundary
+
+Every successful compilation derives a workflow name and id from the
+instruction, adds a short uniqueness suffix, and creates a new JSON file with an
+exclusive no-overwrite operation. Studio lists these files and passes the
+selected id to the runtime. Visible final-state evidence is derived from the
+selected workflow's state-changing actions, locators, and postconditions rather
+than a demo-specific target.
 
 ## Production Topology
 

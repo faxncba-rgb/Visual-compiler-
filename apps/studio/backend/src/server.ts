@@ -1,6 +1,7 @@
 import express from "express";
 import { constants, existsSync } from "node:fs";
-import { access, mkdir, readFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile } from "node:fs/promises";
+import path from "node:path";
 import { compileWorkflow } from "@visual-compiler/compiler";
 import { runCompiledWorkflow } from "@visual-compiler/runtime";
 import {
@@ -13,6 +14,7 @@ import {
 
 const port = Number(process.env.STUDIO_PORT ?? 3000);
 const host = process.env.STUDIO_HOST ?? "0.0.0.0";
+const defaultWorkflowId = path.basename(WORKFLOW_PATH, ".json");
 
 function normalizedBaseUrl(value: string, variableName: string) {
   try {
@@ -54,6 +56,42 @@ function demoUrl(baseUrl: string, variant: "A" | "B") {
 async function ensureWorkflowStorage() {
   await mkdir(WORKFLOW_STORAGE_DIR, { recursive: true });
   await access(WORKFLOW_STORAGE_DIR, constants.R_OK | constants.W_OK);
+}
+
+function workflowArtifactPath(workflowId: string) {
+  if (!/^[a-z0-9][a-z0-9.-]{0,119}$/.test(workflowId)) {
+    throw new Error("Invalid workflow artifact id.");
+  }
+  return path.join(WORKFLOW_STORAGE_DIR, `${workflowId}.json`);
+}
+
+async function listWorkflowArtifacts() {
+  await ensureWorkflowStorage();
+  const entries = await readdir(WORKFLOW_STORAGE_DIR, { withFileTypes: true });
+  const workflows = await Promise.all(
+    entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .map(async (entry) => {
+        try {
+          const workflow = JSON.parse(
+            await readFile(path.join(WORKFLOW_STORAGE_DIR, entry.name), "utf8"),
+          );
+          return {
+            id: path.basename(entry.name, ".json"),
+            name: String(workflow.name ?? path.basename(entry.name, ".json")),
+            compiledAt: String(workflow.compiledAt ?? ""),
+            interpretationSource: String(
+              workflow.diagnostics?.interpretationSource ?? "unknown",
+            ),
+          };
+        } catch {
+          return null;
+        }
+      }),
+  );
+  return workflows
+    .filter((workflow) => workflow !== null)
+    .sort((a, b) => b.compiledAt.localeCompare(a.compiledAt));
 }
 
 function studioHtml() {
@@ -131,6 +169,7 @@ function studioHtml() {
       <h2>Instruction</h2>
       <textarea id="instruction" aria-label="Workflow instruction">${escapeHtml(DEFAULT_INSTRUCTION)}</textarea>
       <div class="row">
+        <select id="workflow" aria-label="Compiled workflow"></select>
         <select id="variant" aria-label="Demo layout"><option value="A">Variant A</option><option value="B">Variant B</option></select>
         <button class="primary" id="compile">Compile</button>
         <button class="secondary" id="runA">Run A</button>
@@ -163,7 +202,8 @@ function studioHtml() {
     const publicDemoUrl = ${serializedPublicDemoUrl};
     const state = { workflow: null, telemetry: null, tab: "ir" };
     const output = document.getElementById("output");
-    const controls = Array.from(document.querySelectorAll("#compile, #runA, #runB"));
+    const workflowSelect = document.getElementById("workflow");
+    const controls = Array.from(document.querySelectorAll("#workflow, #variant, #compile, #runA, #runB"));
     const variantUrl = variant => publicDemoUrl + "/demo?variant=" + variant;
     const setBusy = busy => controls.forEach(button => { button.disabled = busy; });
     const setStatus = (text, cls = "warn") => { const el = document.getElementById("status"); el.textContent = text; el.className = cls; };
@@ -173,6 +213,36 @@ function studioHtml() {
       const usage = workflow.diagnostics.tokenUsage;
       document.getElementById("compileTokens").textContent = usage ? usage.inputTokens + " / " + usage.outputTokens : "-";
       document.getElementById("confidence").textContent = Math.round(workflow.steps[0].selectedLocator.confidence * 100) + "%";
+    };
+    const applyWorkflow = workflow => {
+      state.workflow = workflow;
+      showWorkflowMetrics(workflow);
+      setStatus("Artifact loaded", "ok");
+      render();
+    };
+    const refreshWorkflowList = async preferredId => {
+      const response = await fetch("/api/workflows");
+      if (!response.ok) throw new Error("Unable to list workflow artifacts.");
+      const json = await response.json();
+      workflowSelect.replaceChildren(
+        ...json.workflows.map(workflow => {
+          const option = document.createElement("option");
+          option.value = workflow.id;
+          option.textContent = workflow.name;
+          return option;
+        })
+      );
+      const selectedId = json.workflows.some(workflow => workflow.id === preferredId)
+        ? preferredId
+        : json.workflows[0]?.id;
+      if (selectedId) workflowSelect.value = selectedId;
+      return selectedId;
+    };
+    const loadWorkflow = async workflowId => {
+      if (!workflowId) return;
+      const response = await fetch("/api/workflow?id=" + encodeURIComponent(workflowId));
+      if (!response.ok) throw new Error("Unable to load workflow artifact.");
+      applyWorkflow(await response.json());
     };
     const render = () => {
       if (!state.workflow) { output.textContent = "No workflow loaded."; return; }
@@ -196,10 +266,9 @@ function studioHtml() {
       try {
         const variant = document.getElementById("variant").value;
         const json = await requestJson("/api/compile", { instruction: document.getElementById("instruction").value, variant });
-        state.workflow = json.workflow;
-        showWorkflowMetrics(state.workflow);
+        await refreshWorkflowList(json.workflow.id);
+        applyWorkflow(json.workflow);
         setStatus("Compiled", "ok");
-        render();
       } catch (error) {
         setStatus("Failed", "error");
         output.textContent = JSON.stringify(error.response ?? { error: error.message }, null, 2);
@@ -212,7 +281,7 @@ function studioHtml() {
       setStatus("Opening visible Chromium");
       document.getElementById("demo").src = variantUrl(variant);
       try {
-        const json = await requestJson("/api/run", { variant, visible: true });
+        const json = await requestJson("/api/run", { variant, visible: true, workflowId: workflowSelect.value });
         state.telemetry = json.telemetry;
         document.getElementById("runtimeCalls").textContent = state.telemetry.llmCalls;
         setStatus("Visible replay passed", "ok");
@@ -227,17 +296,19 @@ function studioHtml() {
     }
     document.getElementById("runA").addEventListener("click", () => run("A"));
     document.getElementById("runB").addEventListener("click", () => run("B"));
+    workflowSelect.addEventListener("change", () => {
+      loadWorkflow(workflowSelect.value).catch(error => {
+        setStatus("Failed", "error");
+        output.textContent = JSON.stringify({ error: error.message }, null, 2);
+      });
+    });
     render();
-    fetch("/api/workflow")
-      .then(response => response.ok ? response.json() : null)
-      .then(workflow => {
-        if (!workflow) return;
-        state.workflow = workflow;
-        showWorkflowMetrics(workflow);
-        setStatus("Artifact loaded", "ok");
-        render();
-      })
-      .catch(() => {});
+    refreshWorkflowList(${JSON.stringify(defaultWorkflowId)})
+      .then(loadWorkflow)
+      .catch(error => {
+        setStatus("Failed", "error");
+        output.textContent = JSON.stringify({ error: error.message }, null, 2);
+      });
   </script>
 </body>
 </html>`;
@@ -297,7 +368,7 @@ app.post("/api/compile", async (req, res) => {
     const workflow = await compileWorkflow({
       instruction,
       url: demoUrl(internalDemoUrl, variant),
-      outPath: WORKFLOW_PATH,
+      outDir: WORKFLOW_STORAGE_DIR,
     });
     res.json({ workflow });
   } catch (error) {
@@ -309,25 +380,23 @@ app.post("/api/compile", async (req, res) => {
 app.post("/api/run", async (req, res) => {
   try {
     await ensureWorkflowStorage();
-    if (!existsSync(WORKFLOW_PATH)) {
-      await compileWorkflow({
-        instruction: DEFAULT_INSTRUCTION,
-        url: demoUrl(internalDemoUrl, "A"),
-        outPath: WORKFLOW_PATH,
-      });
-    }
     const variant = req.body.variant === "B" ? "B" : "A";
     const visible = req.body.visible === true;
+    const workflowId =
+      typeof req.body.workflowId === "string"
+        ? req.body.workflowId
+        : defaultWorkflowId;
+    const selectedWorkflowPath = workflowArtifactPath(workflowId);
+    if (!existsSync(selectedWorkflowPath)) {
+      res.status(404).json({ error: "Workflow artifact not found." });
+      return;
+    }
     const telemetry = await runCompiledWorkflow({
-      workflowPath: WORKFLOW_PATH,
+      workflowPath: selectedWorkflowPath,
       url: demoUrl(internalDemoUrl, variant),
       headless: !visible,
       slowMo: visible ? 500 : 0,
       keepOpenMs: visible ? 4_000 : 0,
-      finalStateExpectations: {
-        checkedAccessibleName: "Insurance document primary checkbox",
-        visibleText: "Compiled workflow completed",
-      },
     });
     res.json({ telemetry });
   } catch (error) {
@@ -336,9 +405,22 @@ app.post("/api/run", async (req, res) => {
       .json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
-app.get("/api/workflow", async (_req, res) => {
+app.get("/api/workflows", async (_req, res) => {
   try {
-    res.json(JSON.parse(await readFile(WORKFLOW_PATH, "utf8")));
+    res.json({ workflows: await listWorkflowArtifacts() });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.get("/api/workflow", async (req, res) => {
+  try {
+    const workflowId =
+      typeof req.query.id === "string" ? req.query.id : defaultWorkflowId;
+    res.json(
+      JSON.parse(await readFile(workflowArtifactPath(workflowId), "utf8")),
+    );
   } catch {
     res.status(404).json({ error: "No compiled workflow yet." });
   }

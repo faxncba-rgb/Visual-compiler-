@@ -30,6 +30,9 @@
   inspection and replay.
 - Local visible replay in a separate Chromium window with slow motion,
   final-state hold, and DOM-backed final-state evidence in telemetry.
+- Append-only instruction-derived artifact identities, artifact registry API,
+  and Studio workflow selection.
+- Workflow-derived final-state verification and Playwright select execution.
 - Production Dockerfile and Compose template.
 - Deployment, verification, update, backup, and rollback documentation.
 - Unit, integration, deployment-configuration, mobile, and runtime E2E tests.
@@ -70,6 +73,10 @@
   added a recursive strict-schema regression test.
 - Replaced invisible headless Studio replay with explicit headful local replay
   while preserving headless defaults for APIs and automated tests.
+- Replaced the single overwrite-prone output path with exclusive versioned
+  artifact publication and explicit Studio selection.
+- Restricted the offline interpreter to its documented fixture instead of
+  silently accepting unrelated instructions.
 
 ## Testing Generated or Improved with Codex
 
@@ -90,6 +97,9 @@
   than regenerating it with the offline interpreter.
 - Automated assertions that the intended checkbox is checked and the
   confirmation result is visible after replay.
+- Tests for two distinct instruction artifacts, immutable reference SHA,
+  removal of replay target specialization, strict mock rejection, and select
+  execution.
 
 ## GPT-5.6 Contribution at Compile Time
 
@@ -104,8 +114,8 @@ zero-OpenAI replay on both controlled layouts.
 The `codex/vps-mobile-deployment` branch contains the deployment/mobile milestone
 plus a validated local GPT-5.6 compile-and-replay milestone. It has not been
 pushed or deployed. Docker/VPS files are retained as an unvalidated option; the
-active handoff is the local macOS demo and an optional, separately authorized
-GitHub pull request.
+active handoff is the local macOS demo with selectable versioned artifacts and
+an optional, separately authorized GitHub pull request.
 
 ## Feedback
 

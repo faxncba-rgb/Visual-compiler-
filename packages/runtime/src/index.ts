@@ -13,19 +13,12 @@ export type RuntimeOptions = {
   headless?: boolean;
   slowMo?: number;
   keepOpenMs?: number;
-  finalStateExpectations?: FinalStateExpectations;
-};
-
-export type FinalStateExpectations = {
-  checkedAccessibleName: string;
-  visibleText: string;
 };
 
 type RuntimeExecutionOptions = {
   headless?: boolean;
   slowMo?: number;
   keepOpenMs?: number;
-  finalStateExpectations?: FinalStateExpectations;
 };
 
 async function resolveSemanticLocator(
@@ -109,6 +102,8 @@ async function runStep(page: Page, step: SemanticStep) {
   else if (step.action === "uncheck") await target.uncheck();
   else if (step.action === "click") await target.click();
   else if (step.action === "fill") await target.fill(step.value ?? "");
+  else if (step.action === "select")
+    await target.selectOption(step.value ?? "");
   else if (step.action === "wait") await target.waitFor({ state: "visible" });
   else if (step.action === "assert") await target.waitFor({ state: "visible" });
   else throw new Error(`Unsupported runtime action: ${step.action}`);
@@ -131,36 +126,129 @@ async function runStep(page: Page, step: SemanticStep) {
   }
 }
 
-async function verifyFinalState(
-  page: Page,
-  expectations: FinalStateExpectations,
-) {
-  const checkbox = page.getByRole("checkbox", {
-    name: expectations.checkedAccessibleName,
-  });
-  const checked =
-    (await checkbox.count()) === 1 && (await checkbox.isChecked());
-  if (!checked) {
+type FinalStateCheck = NonNullable<
+  RuntimeTelemetry["finalState"]
+>["checks"][number];
+
+function stepTargetName(step: SemanticStep) {
+  return (
+    step.target.accessibleName ??
+    step.selectedLocator?.rule?.candidateText ??
+    step.selectedLocator?.primary ??
+    step.intent
+  );
+}
+
+function passedCheck(
+  kind: FinalStateCheck["kind"],
+  target: string,
+  expected: string | boolean,
+  actual: string | boolean,
+): FinalStateCheck {
+  if (actual !== expected) {
     throw new Error(
-      `Final state failed: checkbox "${expectations.checkedAccessibleName}" is not visibly checked.`,
+      `Final state failed for ${kind} "${target}": expected ${JSON.stringify(expected)}, received ${JSON.stringify(actual)}.`,
     );
   }
+  return { kind, target, expected, actual, passed: true };
+}
 
-  const result = page.getByText(expectations.visibleText, { exact: true });
-  const textVisible =
-    (await result.count()) === 1 && (await result.isVisible());
-  if (!textVisible) {
-    throw new Error(
-      `Final state failed: confirmation text "${expectations.visibleText}" is not visible.`,
-    );
+async function verifyDerivedFinalState(page: Page, workflow: SemanticWorkflow) {
+  const checks: FinalStateCheck[] = [];
+  const statefulSteps = new Map<string, SemanticStep>();
+  for (const step of workflow.steps) {
+    if (["check", "uncheck", "fill", "select"].includes(step.action)) {
+      statefulSteps.set(stepTargetName(step), step);
+    }
   }
 
-  return {
-    checkedAccessibleName: expectations.checkedAccessibleName,
-    checked: true as const,
-    visibleText: expectations.visibleText,
-    textVisible: true as const,
-  };
+  for (const [targetName, step] of statefulSteps) {
+    const target = await resolveSemanticLocator(page, step);
+    if (step.action === "check" || step.action === "uncheck") {
+      checks.push(
+        passedCheck(
+          "checkbox-state",
+          targetName,
+          step.action === "check",
+          await target.isChecked(),
+        ),
+      );
+    }
+    if (step.action === "fill") {
+      checks.push(
+        passedCheck(
+          "input-value",
+          targetName,
+          step.value ?? "",
+          await target.inputValue(),
+        ),
+      );
+    }
+    if (step.action === "select") {
+      checks.push(
+        passedCheck(
+          "select-value",
+          targetName,
+          step.value ?? "",
+          await target.inputValue(),
+        ),
+      );
+    }
+  }
+
+  for (const step of workflow.steps) {
+    for (const assertion of step.postconditions) {
+      if (assertion.type === "text-visible") {
+        const expected = String(assertion.expected ?? assertion.target);
+        checks.push(
+          passedCheck(
+            "text-visible",
+            assertion.target,
+            true,
+            await page
+              .getByText(expected, { exact: true })
+              .first()
+              .isVisible()
+              .catch(() => false),
+          ),
+        );
+      }
+      if (assertion.type === "checkbox-state") {
+        const target = await resolveSemanticLocator(page, step);
+        checks.push(
+          passedCheck(
+            "checkbox-state",
+            assertion.target,
+            Boolean(assertion.expected),
+            await target.isChecked(),
+          ),
+        );
+      }
+      if (assertion.type === "element-visible") {
+        const target = await resolveSemanticLocator(page, step);
+        checks.push(
+          passedCheck(
+            "element-visible",
+            assertion.target,
+            Boolean(assertion.expected ?? true),
+            await target.isVisible(),
+          ),
+        );
+      }
+      if (assertion.type === "element-enabled") {
+        const target = await resolveSemanticLocator(page, step);
+        checks.push(
+          passedCheck(
+            "element-enabled",
+            assertion.target,
+            Boolean(assertion.expected ?? true),
+            await target.isEnabled(),
+          ),
+        );
+      }
+    }
+  }
+  return { checks };
 }
 
 export async function runWorkflowObject(
@@ -231,12 +319,7 @@ export async function runWorkflowObject(
         throw error;
       }
     }
-    if (options.finalStateExpectations) {
-      telemetry.finalState = await verifyFinalState(
-        page,
-        options.finalStateExpectations,
-      );
-    }
+    telemetry.finalState = await verifyDerivedFinalState(page, workflow);
     if (!headless && keepOpenMs > 0) {
       await page.waitForTimeout(keepOpenMs);
     }
@@ -260,6 +343,5 @@ export async function runCompiledWorkflow(options: RuntimeOptions) {
     headless: options.headless,
     slowMo: options.slowMo,
     keepOpenMs: options.keepOpenMs,
-    finalStateExpectations: options.finalStateExpectations,
   });
 }

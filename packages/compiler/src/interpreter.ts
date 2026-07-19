@@ -3,6 +3,7 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import type { PageModel } from "@visual-compiler/page-model";
 import { SemanticStepSchema } from "@visual-compiler/semantic-ir";
+import { DEFAULT_INSTRUCTION } from "@visual-compiler/shared";
 
 export const InterpreterResponseSchema = z.object({
   name: z.string(),
@@ -103,7 +104,21 @@ function removeNullObjectFields(value: unknown): unknown {
   return value;
 }
 
-export function mockInterpretInstruction(): InterpreterResponse {
+function normalizeInstruction(instruction: string) {
+  return instruction.trim().replace(/\s+/g, " ");
+}
+
+export function mockInterpretInstruction(
+  instruction = DEFAULT_INSTRUCTION,
+): InterpreterResponse {
+  if (
+    normalizeInstruction(instruction) !==
+    normalizeInstruction(DEFAULT_INSTRUCTION)
+  ) {
+    throw new Error(
+      "The offline mock interpreter supports only the documented Pending review fixture. Enable live compilation for other instructions.",
+    );
+  }
   return InterpreterResponseSchema.parse({
     name: "Pending review approval",
     assumptions: [
@@ -269,7 +284,7 @@ export async function interpretInstruction(
     };
   }
   return {
-    result: mockInterpretInstruction(),
+    result: mockInterpretInstruction(instruction),
     responseModel: undefined,
     tokenUsage: undefined,
     source: "mock" as const,

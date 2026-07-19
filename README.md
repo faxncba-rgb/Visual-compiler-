@@ -44,10 +44,10 @@ npm run demo:live
 ```
 
 The command sends the page model and instruction to GPT-5.6 once, writes the
-validated workflow artifact, removes the API key from the process environment,
-then runs both variants with zero OpenAI calls. API billing or credits must be
-enabled for the API project that owns the key; a ChatGPT subscription does not
-provide API quota.
+validated workflow to a new versioned artifact, removes the API key from the
+process environment, then runs both variants with zero OpenAI calls. Existing
+artifacts are never replaced. API billing or credits must be enabled for the API
+project that owns the key; a ChatGPT subscription does not provide API quota.
 
 For the interactive demo, open Studio and click `Run A` or `Run B`. Studio opens
 a separate visible Chromium window because Playwright cannot mutate the
@@ -56,6 +56,13 @@ and the checked checkbox plus confirmation message remain visible for four
 seconds before Chromium closes. The saved workflow is reused, so visible replay
 performs zero model and OpenAI network calls. Automated tests continue to request
 headless replay explicitly.
+
+Studio lists the saved artifacts by their instruction-derived name. Compile
+creates and selects a new artifact whose id combines an instruction slug with an
+eight-character uniqueness suffix. Run A/B always executes the selected
+artifact. The offline mock accepts only the exact documented demo instruction;
+different instructions require live compilation and are rejected explicitly
+when live compilation is disabled.
 
 ## Problem
 
@@ -159,7 +166,17 @@ limited to the local macOS demonstration.
 
 ## Limitations
 
-This MVP is a controlled vertical slice. It does not target arbitrary public websites, CAPTCHA solving, authentication bypass, stealth automation, or high-risk transaction flows.
+This MVP is a controlled vertical slice. The demo page exposes buttons,
+checkboxes, and spatially varied table rows. `fill` and `select` are implemented
+in the runtime; `select` is covered with a synthetic test page because the
+controlled demo has no combobox. Locator compilation uses one primary spatial
+relation plus accessible role/name information. Final-state evidence verifies
+state-changing actions and declared postconditions; it does not invent
+undeclared page outcomes. The offline interpreter is a single-fixture test
+double, not a general natural-language interpreter.
+
+The project does not target arbitrary public websites, CAPTCHA solving,
+authentication bypass, stealth automation, or high-risk transaction flows.
 
 ## Build Week Track
 

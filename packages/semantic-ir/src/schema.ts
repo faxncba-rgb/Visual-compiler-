@@ -137,10 +137,22 @@ export const RuntimeTelemetrySchema = z.object({
   openAIRequests: z.literal(0),
   finalState: z
     .object({
-      checkedAccessibleName: z.string(),
-      checked: z.literal(true),
-      visibleText: z.string(),
-      textVisible: z.literal(true),
+      checks: z.array(
+        z.object({
+          kind: z.enum([
+            "checkbox-state",
+            "input-value",
+            "select-value",
+            "text-visible",
+            "element-visible",
+            "element-enabled",
+          ]),
+          target: z.string(),
+          expected: z.union([z.string(), z.boolean()]),
+          actual: z.union([z.string(), z.boolean()]),
+          passed: z.literal(true),
+        }),
+      ),
     })
     .optional(),
   steps: z.array(

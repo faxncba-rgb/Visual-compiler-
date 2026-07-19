@@ -23,6 +23,9 @@ test("Studio remains usable at an iPhone Safari viewport", async ({ page }) => {
     page.getByRole("heading", { name: "Visual Compiler" }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Compile" })).toBeVisible();
+  await expect(page.getByLabel("Compiled workflow")).toHaveValue(
+    "pending-review.workflow",
+  );
   await expect(page.getByTitle("Controlled workflow demo")).toBeVisible();
   await expect(page.locator("#status")).toHaveText("Artifact loaded");
   await expect(page.locator("#compileCalls")).toHaveText("1");
@@ -46,17 +49,24 @@ test("Studio remains usable at an iPhone Safari viewport", async ({ page }) => {
   expect(layout.columns.split(" ")).toHaveLength(1);
 
   const replay = await page.request.post("http://127.0.0.1:3000/api/run", {
-    data: { variant: "A", visible: false },
+    data: {
+      variant: "A",
+      visible: false,
+      workflowId: "pending-review.workflow",
+    },
   });
   await expect(replay).toBeOK();
   expect((await replay.json()).telemetry).toMatchObject({
     llmCalls: 0,
     openAIRequests: 0,
     finalState: {
-      checkedAccessibleName: "Insurance document primary checkbox",
-      checked: true,
-      visibleText: "Compiled workflow completed",
-      textVisible: true,
+      checks: expect.arrayContaining([
+        expect.objectContaining({
+          kind: "checkbox-state",
+          actual: true,
+          passed: true,
+        }),
+      ]),
     },
   });
 });

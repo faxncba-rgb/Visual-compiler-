@@ -16,6 +16,9 @@
   VPS deployment template.
 - Milestone 11: real local GPT-5.6 Structured Outputs compilation and
   deterministic replay of the generated workflow across variants A and B.
+- Milestone 12: append-only versioned workflow artifacts, Studio artifact
+  selection, workflow-derived replay checks, strict offline fixture behavior,
+  and implemented select execution.
 
 ## Current State
 
@@ -25,13 +28,17 @@
 - Studio loads the saved workflow artifact and compile diagnostics on startup,
   so the local Safari demo can inspect and replay the GPT-5.6 result without
   triggering another compile request.
+- Studio lists all valid workflow artifacts and executes the selected id.
+  Successful compilation creates a new instruction-derived id/name with an
+  eight-character suffix and cannot replace an existing file.
 - Studio Run A/B opens a separate headful Chromium replay with 500 ms slow
   motion and a four-second final-state hold. The embedded iframe remains an
   independent preview because it cannot share Playwright's browser context.
 - `DEMO_SITE_INTERNAL_URL` is used by server-side Playwright;
   `DEMO_SITE_PUBLIC_URL` is used by the iframe.
-- Compiled workflows are written atomically to `WORKFLOW_STORAGE_DIR` and the
-  production template mounts a named volume there.
+- Compiled workflows are published atomically with an exclusive no-overwrite
+  operation in `WORKFLOW_STORAGE_DIR`; the production template mounts a named
+  volume there.
 - Studio and demo expose JSON health endpoints; Studio health verifies that
   workflow storage is readable and writable.
 - Playwright and the production Microsoft Playwright image are pinned to
@@ -71,17 +78,28 @@
 - Studio previously ran Playwright headless, so successful actions were invisible
   in the separate iframe. Interactive runs now request a visible browser while
   API and automated test runs remain headless by default.
+- Studio compilation previously targeted the single validated artifact path.
+  Compilation now creates versioned files, while listing/loading/running uses an
+  explicitly validated artifact id.
+- Visible replay previously asserted one Insurance document checkbox in server
+  code. Runtime final-state evidence is now derived from state-changing actions,
+  locators, and postconditions in the selected workflow.
+- The schema advertised `select` while runtime rejected it. Runtime now executes
+  Playwright `selectOption` and verifies the resulting value.
+- The offline mock previously ignored alternate instructions. It now accepts
+  only the normalized documented fixture and rejects every other instruction.
 
 ## Verification Status
 
 - Dependency install: `npm ci` passed with npm 11.10.0 bootstrapped through the
   bundled Node environment; audit reported zero vulnerabilities.
 - `npm run build`: passing.
-- `npm test`: passing.
+- `npm test`: 17 tests passing.
 - Matching Playwright Chromium 1228 for Playwright `1.61.1`: installed.
-- `npm run test:e2e`: three tests passing, including isolated compile/replay,
-  direct replay of the tracked GPT-5.6 artifact on variants A/B, and an
-  iPhone-sized Safari-user-agent Studio check.
+- `npm run test:e2e`: five tests passing with OpenAI variables removed,
+  including isolated compile/replay, direct replay of the tracked GPT-5.6
+  artifact on variants A/B, two-instruction versioned artifact generation,
+  select execution, and an iPhone-sized Safari-user-agent Studio check.
 - Strict Structured Outputs schema test: passing and verifies that all generated
   object schemas forbid additional properties and require every property.
 - Real local GPT-5.6 compilation: passing with one compile-time model call,
@@ -98,6 +116,9 @@
   tracked GPT-5.6 artifact and Studio's `/api/run` path.
 - Secret audit after artifact generation: passing; `.env` remains ignored and no
   API key appears in tracked or untracked project files.
+- Validated artifact immutability: SHA-256 remains
+  `c08d5ce63b6ef07ca9947d01b4ed3744aafea94f942279919df0efcd9fed6d63`
+  before and after build, unit/integration tests, and E2E.
 - Compose YAML parse: passing.
 - Docker image build and `docker compose config`: not run because Docker is not
   installed in this workspace environment.
