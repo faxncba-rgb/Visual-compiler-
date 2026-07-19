@@ -80,6 +80,7 @@ function studioHtml() {
     h1 { margin: 0 0 6px; font-size: 24px; }
     h2 { margin: 0 0 12px; font-size: 14px; color: #9facbf; text-transform: uppercase; letter-spacing: .08em; }
     .tagline { color: #9facbf; margin-top: 0; }
+    .hint { color: #9facbf; font-size: 13px; line-height: 1.4; margin: 10px 0 0; }
     textarea { display: block; width: 100%; min-height: 156px; resize: vertical; border: 1px solid #3b4555; background: #171b22; color: #f5f7fb; border-radius: 7px; padding: 12px; font: inherit; font-size: 16px; line-height: 1.4; }
     button, select { min-height: 44px; border: 1px solid #3c4858; background: #1d2430; color: #f3f6fb; border-radius: 7px; padding: 10px 12px; font: inherit; font-weight: 700; touch-action: manipulation; }
     button { cursor: pointer; }
@@ -135,6 +136,7 @@ function studioHtml() {
         <button class="secondary" id="runA">Run A</button>
         <button class="secondary" id="runB">Run B</button>
       </div>
+      <p class="hint">Run A/B opens a separate visible Chromium replay. The iframe remains an independent preview.</p>
       <div style="margin-top:18px" aria-live="polite">
         <div class="metric"><span>Compile-time model calls</span><strong id="compileCalls">0</strong></div>
         <div class="metric"><span>Compile response model</span><strong id="compileModel">-</strong></div>
@@ -207,13 +209,13 @@ function studioHtml() {
     });
     async function run(variant) {
       setBusy(true);
-      setStatus("Running");
+      setStatus("Opening visible Chromium");
       document.getElementById("demo").src = variantUrl(variant);
       try {
-        const json = await requestJson("/api/run", { variant });
+        const json = await requestJson("/api/run", { variant, visible: true });
         state.telemetry = json.telemetry;
         document.getElementById("runtimeCalls").textContent = state.telemetry.llmCalls;
-        setStatus("Passed", "ok");
+        setStatus("Visible replay passed", "ok");
       } catch (error) {
         state.telemetry = error.response ?? { error: error.message };
         setStatus("Failed", "error");
@@ -315,10 +317,17 @@ app.post("/api/run", async (req, res) => {
       });
     }
     const variant = req.body.variant === "B" ? "B" : "A";
+    const visible = req.body.visible === true;
     const telemetry = await runCompiledWorkflow({
       workflowPath: WORKFLOW_PATH,
       url: demoUrl(internalDemoUrl, variant),
-      headless: true,
+      headless: !visible,
+      slowMo: visible ? 500 : 0,
+      keepOpenMs: visible ? 4_000 : 0,
+      finalStateExpectations: {
+        checkedAccessibleName: "Insurance document primary checkbox",
+        visibleText: "Compiled workflow completed",
+      },
     });
     res.json({ telemetry });
   } catch (error) {

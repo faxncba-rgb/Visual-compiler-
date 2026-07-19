@@ -44,4 +44,19 @@ test("Studio remains usable at an iPhone Safari viewport", async ({ page }) => {
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.viewportWidth);
   expect(layout.compileHeight).toBeGreaterThanOrEqual(44);
   expect(layout.columns.split(" ")).toHaveLength(1);
+
+  const replay = await page.request.post("http://127.0.0.1:3000/api/run", {
+    data: { variant: "A", visible: false },
+  });
+  await expect(replay).toBeOK();
+  expect((await replay.json()).telemetry).toMatchObject({
+    llmCalls: 0,
+    openAIRequests: 0,
+    finalState: {
+      checkedAccessibleName: "Insurance document primary checkbox",
+      checked: true,
+      visibleText: "Compiled workflow completed",
+      textVisible: true,
+    },
+  });
 });

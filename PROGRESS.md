@@ -25,6 +25,9 @@
 - Studio loads the saved workflow artifact and compile diagnostics on startup,
   so the local Safari demo can inspect and replay the GPT-5.6 result without
   triggering another compile request.
+- Studio Run A/B opens a separate headful Chromium replay with 500 ms slow
+  motion and a four-second final-state hold. The embedded iframe remains an
+  independent preview because it cannot share Playwright's browser context.
 - `DEMO_SITE_INTERNAL_URL` is used by server-side Playwright;
   `DEMO_SITE_PUBLIC_URL` is used by the iframe.
 - Compiled workflows are written atomically to `WORKFLOW_STORAGE_DIR` and the
@@ -65,6 +68,9 @@
 - The original interpreter schema used optional object properties, which strict
   Structured Outputs rejects; the API-facing schema now uses required nullable
   fields and strips null object fields before application validation.
+- Studio previously ran Playwright headless, so successful actions were invisible
+  in the separate iframe. Interactive runs now request a visible browser while
+  API and automated test runs remain headless by default.
 
 ## Verification Status
 
@@ -84,6 +90,12 @@
 - The generated two-step workflow selected unique accessibility locators at
   0.96 confidence. Deterministic replay passed on variants A and B with
   `llmCalls: 0`, `openAIRequests: 0`, and every step passing.
+- Visible replay on macOS variants A and B: passing. Step durations were
+  approximately 500 ms, final state remained open for four seconds, and
+  telemetry verified the Insurance document checkbox was checked and
+  `Compiled workflow completed` was visible.
+- Automated final-state verification: passing in headless E2E for both the
+  tracked GPT-5.6 artifact and Studio's `/api/run` path.
 - Secret audit after artifact generation: passing; `.env` remains ignored and no
   API key appears in tracked or untracked project files.
 - Compose YAML parse: passing.

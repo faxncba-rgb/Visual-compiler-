@@ -28,6 +28,8 @@
 - Studio/demo health endpoints.
 - Automatic Studio loading of the saved GPT-5.6 artifact for no-cost local
   inspection and replay.
+- Local visible replay in a separate Chromium window with slow motion,
+  final-state hold, and DOM-backed final-state evidence in telemetry.
 - Production Dockerfile and Compose template.
 - Deployment, verification, update, backup, and rollback documentation.
 - Unit, integration, deployment-configuration, mobile, and runtime E2E tests.
@@ -66,6 +68,8 @@
 - Added client-visible request errors and disabled controls during compile/run.
 - Replaced optional Structured Outputs fields with required nullable fields and
   added a recursive strict-schema regression test.
+- Replaced invisible headless Studio replay with explicit headful local replay
+  while preserving headless defaults for APIs and automated tests.
 
 ## Testing Generated or Improved with Codex
 
@@ -84,6 +88,8 @@
   LLM and OpenAI network calls.
 - Dedicated E2E coverage that loads the tracked GPT-5.6 artifact directly rather
   than regenerating it with the offline interpreter.
+- Automated assertions that the intended checkbox is checked and the
+  confirmation result is visible after replay.
 
 ## GPT-5.6 Contribution at Compile Time
 

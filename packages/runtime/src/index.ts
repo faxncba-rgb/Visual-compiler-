@@ -11,6 +11,21 @@ export type RuntimeOptions = {
   workflowPath: string;
   url: string;
   headless?: boolean;
+  slowMo?: number;
+  keepOpenMs?: number;
+  finalStateExpectations?: FinalStateExpectations;
+};
+
+export type FinalStateExpectations = {
+  checkedAccessibleName: string;
+  visibleText: string;
+};
+
+type RuntimeExecutionOptions = {
+  headless?: boolean;
+  slowMo?: number;
+  keepOpenMs?: number;
+  finalStateExpectations?: FinalStateExpectations;
 };
 
 async function resolveSemanticLocator(
@@ -116,12 +131,49 @@ async function runStep(page: Page, step: SemanticStep) {
   }
 }
 
+async function verifyFinalState(
+  page: Page,
+  expectations: FinalStateExpectations,
+) {
+  const checkbox = page.getByRole("checkbox", {
+    name: expectations.checkedAccessibleName,
+  });
+  const checked =
+    (await checkbox.count()) === 1 && (await checkbox.isChecked());
+  if (!checked) {
+    throw new Error(
+      `Final state failed: checkbox "${expectations.checkedAccessibleName}" is not visibly checked.`,
+    );
+  }
+
+  const result = page.getByText(expectations.visibleText, { exact: true });
+  const textVisible =
+    (await result.count()) === 1 && (await result.isVisible());
+  if (!textVisible) {
+    throw new Error(
+      `Final state failed: confirmation text "${expectations.visibleText}" is not visible.`,
+    );
+  }
+
+  return {
+    checkedAccessibleName: expectations.checkedAccessibleName,
+    checked: true as const,
+    visibleText: expectations.visibleText,
+    textVisible: true as const,
+  };
+}
+
 export async function runWorkflowObject(
   workflow: SemanticWorkflow,
   url: string,
-  headless = true,
+  options: RuntimeExecutionOptions = {},
 ): Promise<RuntimeTelemetry> {
-  const browser = await chromium.launch({ headless });
+  const headless = options.headless ?? true;
+  const keepOpenMs = Math.max(0, options.keepOpenMs ?? 0);
+  const browser = await chromium.launch({
+    headless,
+    slowMo: headless ? 0 : Math.max(0, options.slowMo ?? 0),
+  });
   const page = await browser.newPage({
     viewport: workflow.source.viewport,
     serviceWorkers: "block",
@@ -179,6 +231,15 @@ export async function runWorkflowObject(
         throw error;
       }
     }
+    if (options.finalStateExpectations) {
+      telemetry.finalState = await verifyFinalState(
+        page,
+        options.finalStateExpectations,
+      );
+    }
+    if (!headless && keepOpenMs > 0) {
+      await page.waitForTimeout(keepOpenMs);
+    }
   } finally {
     await browser.close();
   }
@@ -195,5 +256,10 @@ export async function runWorkflowObject(
 export async function runCompiledWorkflow(options: RuntimeOptions) {
   const raw = await readFile(options.workflowPath, "utf8");
   const workflow = SemanticWorkflowSchema.parse(JSON.parse(raw));
-  return runWorkflowObject(workflow, options.url, options.headless ?? true);
+  return runWorkflowObject(workflow, options.url, {
+    headless: options.headless,
+    slowMo: options.slowMo,
+    keepOpenMs: options.keepOpenMs,
+    finalStateExpectations: options.finalStateExpectations,
+  });
 }

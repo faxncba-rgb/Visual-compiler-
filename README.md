@@ -49,6 +49,14 @@ then runs both variants with zero OpenAI calls. API billing or credits must be
 enabled for the API project that owns the key; a ChatGPT subscription does not
 provide API quota.
 
+For the interactive demo, open Studio and click `Run A` or `Run B`. Studio opens
+a separate visible Chromium window because Playwright cannot mutate the
+independent iframe shown in Safari. Actions run with about 500 ms of slow motion,
+and the checked checkbox plus confirmation message remain visible for four
+seconds before Chromium closes. The saved workflow is reused, so visible replay
+performs zero model and OpenAI network calls. Automated tests continue to request
+headless replay explicitly.
+
 ## Problem
 
 Browser agents often call a model at every click. That creates latency, cost, nondeterminism, privacy risk, and poor auditability. Traditional automation is deterministic, but it struggles with human spatial instructions like "check the first enabled checkbox to the right of Pending review."

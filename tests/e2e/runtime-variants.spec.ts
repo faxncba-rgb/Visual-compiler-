@@ -33,6 +33,10 @@ test("tracked GPT-5.6 artifact replays on variants A and B without OpenAI", asyn
       workflowPath: WORKFLOW_PATH,
       url: `http://127.0.0.1:4173/demo?variant=${variant}`,
       headless: true,
+      finalStateExpectations: {
+        checkedAccessibleName: "Insurance document primary checkbox",
+        visibleText: "Compiled workflow completed",
+      },
     });
     expect(telemetry.llmCalls).toBe(0);
     expect(telemetry.openAIRequests).toBe(0);
@@ -40,5 +44,11 @@ test("tracked GPT-5.6 artifact replays on variants A and B without OpenAI", asyn
     expect(telemetry.steps.every((step) => step.status === "passed")).toBe(
       true,
     );
+    expect(telemetry.finalState).toEqual({
+      checkedAccessibleName: "Insurance document primary checkbox",
+      checked: true,
+      visibleText: "Compiled workflow completed",
+      textVisible: true,
+    });
   }
 });

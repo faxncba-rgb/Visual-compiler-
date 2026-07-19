@@ -135,6 +135,14 @@ export const RuntimeTelemetrySchema = z.object({
   durationMs: z.number().min(0).optional(),
   llmCalls: z.literal(0),
   openAIRequests: z.literal(0),
+  finalState: z
+    .object({
+      checkedAccessibleName: z.string(),
+      checked: z.literal(true),
+      visibleText: z.string(),
+      textVisible: z.literal(true),
+    })
+    .optional(),
   steps: z.array(
     z.object({
       stepId: z.string(),
