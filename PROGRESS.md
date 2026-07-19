@@ -22,6 +22,9 @@
 - Branch: `codex/vps-mobile-deployment`.
 - Studio uses a single-column, safe-area-aware layout at phone widths with
   44-pixel touch controls and a scrollable demo preview/details view.
+- Studio loads the saved workflow artifact and compile diagnostics on startup,
+  so the local Safari demo can inspect and replay the GPT-5.6 result without
+  triggering another compile request.
 - `DEMO_SITE_INTERNAL_URL` is used by server-side Playwright;
   `DEMO_SITE_PUBLIC_URL` is used by the iframe.
 - Compiled workflows are written atomically to `WORKFLOW_STORAGE_DIR` and the

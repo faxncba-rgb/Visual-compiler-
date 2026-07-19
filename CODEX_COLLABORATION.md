@@ -26,6 +26,8 @@
   telemetry.
 - Atomic compiled-workflow writes and configurable persistent storage.
 - Studio/demo health endpoints.
+- Automatic Studio loading of the saved GPT-5.6 artifact for no-cost local
+  inspection and replay.
 - Production Dockerfile and Compose template.
 - Deployment, verification, update, backup, and rollback documentation.
 - Unit, integration, deployment-configuration, mobile, and runtime E2E tests.

@@ -24,6 +24,13 @@ test("Studio remains usable at an iPhone Safari viewport", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Compile" })).toBeVisible();
   await expect(page.getByTitle("Controlled workflow demo")).toBeVisible();
+  await expect(page.locator("#status")).toHaveText("Artifact loaded");
+  await expect(page.locator("#compileCalls")).toHaveText("1");
+  await expect(page.locator("#compileModel")).toHaveText("gpt-5.6-sol");
+  await expect(page.locator("#compileTokens")).toHaveText(/\d+ \/ \d+/);
+  await expect(page.locator("#output")).toContainText(
+    '"interpretationSource": "gpt-5.6"',
+  );
 
   const layout = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,

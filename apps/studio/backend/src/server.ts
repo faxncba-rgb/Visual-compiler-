@@ -165,6 +165,13 @@ function studioHtml() {
     const variantUrl = variant => publicDemoUrl + "/demo?variant=" + variant;
     const setBusy = busy => controls.forEach(button => { button.disabled = busy; });
     const setStatus = (text, cls = "warn") => { const el = document.getElementById("status"); el.textContent = text; el.className = cls; };
+    const showWorkflowMetrics = workflow => {
+      document.getElementById("compileCalls").textContent = workflow.diagnostics.modelCalls;
+      document.getElementById("compileModel").textContent = workflow.diagnostics.responseModel ?? workflow.compileModel;
+      const usage = workflow.diagnostics.tokenUsage;
+      document.getElementById("compileTokens").textContent = usage ? usage.inputTokens + " / " + usage.outputTokens : "-";
+      document.getElementById("confidence").textContent = Math.round(workflow.steps[0].selectedLocator.confidence * 100) + "%";
+    };
     const render = () => {
       if (!state.workflow) { output.textContent = "No workflow loaded."; return; }
       if (state.tab === "ir") output.textContent = JSON.stringify(state.workflow, null, 2);
@@ -188,11 +195,7 @@ function studioHtml() {
         const variant = document.getElementById("variant").value;
         const json = await requestJson("/api/compile", { instruction: document.getElementById("instruction").value, variant });
         state.workflow = json.workflow;
-        document.getElementById("compileCalls").textContent = state.workflow.diagnostics.modelCalls;
-        document.getElementById("compileModel").textContent = state.workflow.diagnostics.responseModel ?? state.workflow.compileModel;
-        const usage = state.workflow.diagnostics.tokenUsage;
-        document.getElementById("compileTokens").textContent = usage ? usage.inputTokens + " / " + usage.outputTokens : "-";
-        document.getElementById("confidence").textContent = Math.round(state.workflow.steps[0].selectedLocator.confidence * 100) + "%";
+        showWorkflowMetrics(state.workflow);
         setStatus("Compiled", "ok");
         render();
       } catch (error) {
@@ -223,6 +226,16 @@ function studioHtml() {
     document.getElementById("runA").addEventListener("click", () => run("A"));
     document.getElementById("runB").addEventListener("click", () => run("B"));
     render();
+    fetch("/api/workflow")
+      .then(response => response.ok ? response.json() : null)
+      .then(workflow => {
+        if (!workflow) return;
+        state.workflow = workflow;
+        showWorkflowMetrics(workflow);
+        setStatus("Artifact loaded", "ok");
+        render();
+      })
+      .catch(() => {});
   </script>
 </body>
 </html>`;
