@@ -51,9 +51,6 @@
   Safari verification remains a deployment-stage check.
 - Docker is unavailable in this workspace, so the image and resolved Compose
   model must be validated on a Docker-capable host before deployment.
-- The local credential file is valid and protected, but the first real GPT-5.6
-  request was rejected by the API project with `insufficient_quota`; a generated
-  GPT-5.6 artifact therefore remains to be demonstrated.
 
 ## Bugs Found and Fixed with Codex
 
@@ -80,19 +77,27 @@
 - Deployment pin, internal/public URL, persistent-volume, and no-host-port
   assertions.
 - Strict OpenAI response-schema compatibility.
+- Real GPT-5.6 artifact generation with response-model and token diagnostics.
+- Replay of that generated workflow on layout variants A and B with zero runtime
+  LLM and OpenAI network calls.
+- Dedicated E2E coverage that loads the tracked GPT-5.6 artifact directly rather
+  than regenerating it with the offline interpreter.
 
 ## GPT-5.6 Contribution at Compile Time
 
 GPT-5.6 interprets the natural-language instruction and page model into validated
 JSON semantic steps when live compilation is explicitly enabled. The runtime
-never imports or calls GPT-5.6.
+never imports or calls GPT-5.6. The local milestone produced the tracked workflow
+with one `gpt-5.6` compile request served by `gpt-5.6-sol`, followed by successful
+zero-OpenAI replay on both controlled layouts.
 
 ## Milestone Handoff
 
 The `codex/vps-mobile-deployment` branch contains the deployment/mobile milestone
-plus local GPT-5.6 integration improvements. It has not been pushed or deployed.
-Docker/VPS files are retained as an unvalidated option; the active handoff is
-local macOS validation after API quota is enabled.
+plus a validated local GPT-5.6 compile-and-replay milestone. It has not been
+pushed or deployed. Docker/VPS files are retained as an unvalidated option; the
+active handoff is the local macOS demo and an optional, separately authorized
+GitHub pull request.
 
 ## Feedback
 

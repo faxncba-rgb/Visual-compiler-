@@ -26,15 +26,17 @@ describe("runtime safeguards", () => {
     expect(existsSync("packages/runtime/src/index.ts")).toBe(true);
   });
 
-  it("ships a validated precompiled runtime artifact", async () => {
+  it("ships the validated GPT-5.6 runtime artifact without credentials", async () => {
     const raw = await readFile(
       "compiled-workflows/pending-review.workflow.json",
       "utf8",
     );
     const workflow = SemanticWorkflowSchema.parse(JSON.parse(raw));
-    expect(workflow.diagnostics.interpretationSource).toBe(
-      "precompiled-sample",
-    );
+    expect(raw).not.toMatch(/sk-[A-Za-z0-9_-]{20,}/);
+    expect(workflow.diagnostics.interpretationSource).toBe("gpt-5.6");
+    expect(workflow.diagnostics.modelCalls).toBe(1);
+    expect(workflow.diagnostics.responseModel).toBe("gpt-5.6-sol");
+    expect(workflow.diagnostics.tokenUsage?.totalTokens).toBeGreaterThan(0);
     expect(workflow.steps[0].selectedLocator?.rule?.candidateRole).toBe(
       "checkbox",
     );
