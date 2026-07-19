@@ -49,12 +49,21 @@
           "stability": 0.82,
           "explanation": "Deterministic geometry: checkbox right-of anchor text \"Pending review\".",
           "fallbackOrder": 0
+        },
+        {
+          "strategy": "spatial-bounds",
+          "selector": "checkbox right-of \"Pending review\" nth=2",
+          "confidence": 0.78,
+          "unique": true,
+          "stability": 0.82,
+          "explanation": "Deterministic geometry: checkbox right-of anchor text \"Pending review\".",
+          "fallbackOrder": 1
         }
       ],
       "selectedLocator": {
         "kind": "semantic-rule",
         "primary": "checkbox right-of \"Pending review\" nth=1",
-        "fallback": "role=checkbox",
+        "fallback": "checkbox right-of \"Pending review\" nth=2",
         "rule": {
           "anchorText": "Pending review",
           "candidateRole": "checkbox",
@@ -64,7 +73,7 @@
           "visibleOnly": true
         },
         "confidence": 0.9,
-        "explanation": "Deterministic geometry resolves the first enabled checkbox to the right of the visible status text."
+        "explanation": "Deterministic geometry: checkbox right-of anchor text \"Pending review\"."
       }
     },
     {
@@ -117,7 +126,7 @@
           "candidateText": "Confirm selection",
           "relation": "below",
           "ordinal": 1,
-          "enabledOnly": true,
+          "enabledOnly": false,
           "visibleOnly": true,
           "color": "green"
         },
@@ -126,8 +135,8 @@
       }
     }
   ],
-  "generatedPlaywright": "import { runCompiledWorkflow } from \"@visual-compiler/runtime\";\n\nawait runCompiledWorkflow({\n  workflowPath: \"compiled-workflows/pending-review.workflow.json\",\n  url: process.env.DEMO_SITE_URL ?? \"http://127.0.0.1:4173/demo?variant=A\",\n  headless: false\n});\n",
-  "compiledAt": "2026-07-18T00:00:00.000Z",
+  "generatedPlaywright": "import { runCompiledWorkflow } from \"@visual-compiler/runtime\";\n\nawait runCompiledWorkflow({\n  workflowPath: \"compiled-workflows/pending-review.workflow.json\",\n  url: process.env.DEMO_SITE_INTERNAL_URL ?? process.env.DEMO_SITE_URL ?? \"http://127.0.0.1:4173/demo?variant=A\",\n  headless: false\n});\n",
+  "compiledAt": "2026-07-19T00:00:00.000Z",
   "compileModel": "gpt-5.6",
   "metadata": {
     "compilerVersion": "0.1.0",

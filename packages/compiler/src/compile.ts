@@ -1,4 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { chromium } from "playwright";
 import { extractPageModel } from "@visual-compiler/page-model";
@@ -102,7 +103,16 @@ export async function compileWorkflow(
 
   if (options.outPath) {
     await mkdir(path.dirname(options.outPath), { recursive: true });
-    await writeFile(options.outPath, JSON.stringify(workflow, null, 2));
+    const temporaryPath = path.join(
+      path.dirname(options.outPath),
+      `${path.basename(options.outPath)}.${randomUUID()}.tmp.json`,
+    );
+    try {
+      await writeFile(temporaryPath, JSON.stringify(workflow, null, 2));
+      await rename(temporaryPath, options.outPath);
+    } finally {
+      await rm(temporaryPath, { force: true });
+    }
   }
   return workflow;
 }

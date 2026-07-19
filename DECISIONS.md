@@ -15,3 +15,25 @@ Date: 2026-07-18
 Status: Accepted
 
 The MVP targets a local demo page with two layout variants. This preserves enough complexity to prove spatial reasoning while keeping judge setup reliable.
+
+## ADR-003: Separate Internal and Public Demo URLs
+
+Date: 2026-07-19
+
+Status: Accepted
+
+Server-side Playwright uses `DEMO_SITE_INTERNAL_URL` on the private Compose
+network. The iframe uses `DEMO_SITE_PUBLIC_URL` through Traefik and HTTPS. This
+avoids asking a remote iPhone to resolve a Docker service name while keeping
+browser automation off the public ingress path.
+
+## ADR-004: Persist Artifacts, Keep Runtime Model-Free
+
+Date: 2026-07-19
+
+Status: Accepted
+
+Compiled workflows are written atomically to a configurable directory backed by
+a named Docker volume. Runtime retains no OpenAI package dependency, rejects
+attempted OpenAI browser traffic, and returns successful telemetry only when
+both model and OpenAI request counts are zero.

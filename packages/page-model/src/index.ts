@@ -25,14 +25,16 @@ export type PageModel = {
 
 export async function extractPageModel(page: Page): Promise<PageModel> {
   const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
-  const nodes = await page.evaluate(() => {
-    const roleFor = (el: Element) => {
+  // Keep this evaluator as a string. TS-on-the-fly loaders can inject helper
+  // references into serialized functions that do not exist in the browser.
+  const nodes = await page.evaluate<PageNode[]>(String.raw`(() => {
+    const roleFor = (el) => {
       const explicit = el.getAttribute("role");
       if (explicit) return explicit;
       const tag = el.tagName.toLowerCase();
       if (tag === "button") return "button";
       if (tag === "input") {
-        const type = (el as HTMLInputElement).type;
+        const type = el.type;
         if (type === "checkbox") return "checkbox";
         if (type === "text" || type === "email" || type === "search")
           return "textbox";
@@ -45,7 +47,7 @@ export async function extractPageModel(page: Page): Promise<PageModel> {
       if (tag === "table") return "table";
       return undefined;
     };
-    const nameFor = (el: Element) => {
+    const nameFor = (el) => {
       const aria = el.getAttribute("aria-label");
       if (aria) return aria.trim();
       if (el instanceof HTMLInputElement) {
@@ -54,18 +56,18 @@ export async function extractPageModel(page: Page): Promise<PageModel> {
       }
       return (el.textContent ?? "").replace(/\s+/g, " ").trim();
     };
-    const path = (el: Element) => {
-      const parts: string[] = [];
-      let cur: Element | null = el;
+    const path = (el) => {
+      const parts = [];
+      let cur = el;
       while (cur && cur !== document.body) {
         const index =
           Array.from(cur.parentElement?.children ?? []).indexOf(cur) + 1;
-        parts.unshift(`${cur.tagName.toLowerCase()}:nth-child(${index})`);
+        parts.unshift(cur.tagName.toLowerCase() + ":nth-child(" + index + ")");
         cur = cur.parentElement;
       }
       return parts.join(">");
     };
-    const isEnabled = (el: Element) =>
+    const isEnabled = (el) =>
       !(
         el instanceof HTMLButtonElement ||
         el instanceof HTMLInputElement ||
@@ -81,13 +83,13 @@ export async function extractPageModel(page: Page): Promise<PageModel> {
           rect.height > 0 &&
           style.visibility !== "hidden" &&
           style.display !== "none";
-        const attrs: Record<string, string> = {};
+        const attrs = {};
         for (const attr of Array.from(el.attributes)) {
           if (["id", "class", "data-row-token"].includes(attr.name)) continue;
           attrs[attr.name] = attr.value;
         }
         const node = {
-          id: `n${index + 1}`,
+          id: "n" + (index + 1),
           tagName: el.tagName.toLowerCase(),
           role: roleFor(el),
           accessibleName: nameFor(el),
@@ -99,9 +101,7 @@ export async function extractPageModel(page: Page): Promise<PageModel> {
             el instanceof HTMLInputElement && el.type === "checkbox"
               ? el.checked
               : undefined,
-          color:
-            (el.getAttribute("data-icon-color") as
-              "green" | "red" | "neutral" | "warning" | null) ?? undefined,
+          color: el.getAttribute("data-icon-color") ?? undefined,
           attributes: attrs,
           parentPath: el.parentElement ? path(el.parentElement) : undefined,
         };
@@ -111,7 +111,7 @@ export async function extractPageModel(page: Page): Promise<PageModel> {
         (node) =>
           node.visible || ["input", "button", "select"].includes(node.tagName),
       );
-  });
+  })()`);
   return {
     url: page.url(),
     viewport,

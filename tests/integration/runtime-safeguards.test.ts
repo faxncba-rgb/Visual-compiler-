@@ -8,6 +8,9 @@ describe("runtime safeguards", () => {
     const source = await readFile("packages/runtime/src/index.ts", "utf8");
     expect(source).not.toMatch(/from ["']openai["']/);
     expect(source).not.toMatch(/new OpenAI/);
+    expect(source).toContain('serviceWorkers: "block"');
+    expect(source).toContain('await route.abort("blockedbyclient")');
+    expect(source).toContain("await page.routeWebSocket(");
   });
 
   it("runtime package has no OpenAI dependency", async () => {

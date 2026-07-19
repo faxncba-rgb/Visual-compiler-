@@ -8,10 +8,18 @@ export default defineConfig({
     trace: "on-first-retry",
     ...devices["Desktop Chrome"],
   },
-  webServer: {
-    command: "npm run dev:demo",
-    url: "http://127.0.0.1:4173/health",
-    reuseExistingServer: true,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: "npm run dev:demo",
+      url: "http://127.0.0.1:4173/health",
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+    {
+      command: "npm run dev:studio",
+      url: "http://127.0.0.1:3000/health",
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+  ],
 });

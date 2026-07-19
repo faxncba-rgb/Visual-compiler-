@@ -73,7 +73,7 @@ packages/compiler       GPT-5.6 compile-time interpreter and codegen
 packages/runtime        Playwright runtime with no OpenAI dependency
 compiled-workflows      Saved deterministic artifacts
 tests                   Unit, integration, and E2E tests
-docs                    Supporting architecture and submission docs
+DEPLOYMENT.md            Hostinger VPS deployment, update, and rollback guide
 ```
 
 ## Testing
@@ -89,6 +89,8 @@ If Playwright reports that Chromium is missing, run:
 npx playwright install chromium
 ```
 
+The project pins Playwright and its production browser image to `1.61.1`.
+
 In restricted sandboxes where npm cannot write to `/root/.npm`, use:
 
 ```bash
@@ -97,7 +99,26 @@ npm --cache /tmp/npm-cache install
 
 ## Security and Privacy
 
-The runtime package has no OpenAI SDK dependency, compiled workflows do not store API keys, and runtime telemetry reports `llmCalls: 0`. This project is intended only for authorized browser automation.
+The runtime package has no OpenAI SDK dependency, compiled workflows do not
+store API keys, and runtime telemetry reports `llmCalls: 0`. The runtime also
+blocks browser requests to OpenAI hosts and fails the run if a page attempts one.
+This project is intended only for authorized browser automation.
+
+## Production deployment template
+
+The repository includes a production [Dockerfile](Dockerfile) and
+[Traefik-compatible Compose template](compose.production.yml). The image contains
+the matching Chromium build and Linux dependencies. Compiled workflows are
+stored in a named volume.
+
+Production keeps two URLs intentionally separate:
+
+- `DEMO_SITE_INTERNAL_URL` is reachable only by server-side Playwright.
+- `DEMO_SITE_PUBLIC_URL` is the HTTPS URL loaded by the Studio iframe.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for preparation, health verification,
+credential handling, safe updates, backups, and rollback. The template has not
+been deployed to a VPS.
 
 ## Limitations
 

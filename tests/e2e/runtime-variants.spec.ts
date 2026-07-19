@@ -1,19 +1,20 @@
 import { test, expect } from "@playwright/test";
 import { compileWorkflow } from "@visual-compiler/compiler";
 import { runCompiledWorkflow } from "@visual-compiler/runtime";
-import { DEFAULT_INSTRUCTION, WORKFLOW_PATH } from "@visual-compiler/shared";
+import { DEFAULT_INSTRUCTION } from "@visual-compiler/shared";
 
-test("compiled workflow replays on variants A and B with zero runtime LLM calls", async () => {
+test("compiled workflow replays on variants A and B with zero runtime LLM calls", async ({}, testInfo) => {
+  const workflowPath = testInfo.outputPath("pending-review.workflow.json");
   await compileWorkflow({
     instruction: DEFAULT_INSTRUCTION,
     url: "http://127.0.0.1:4173/demo?variant=A",
-    outPath: WORKFLOW_PATH,
+    outPath: workflowPath,
     headless: true,
   });
   delete process.env.OPENAI_API_KEY;
   for (const variant of ["A", "B"] as const) {
     const telemetry = await runCompiledWorkflow({
-      workflowPath: WORKFLOW_PATH,
+      workflowPath,
       url: `http://127.0.0.1:4173/demo?variant=${variant}`,
       headless: true,
     });

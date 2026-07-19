@@ -122,13 +122,33 @@ export async function runWorkflowObject(
   headless = true,
 ): Promise<RuntimeTelemetry> {
   const browser = await chromium.launch({ headless });
-  const page = await browser.newPage({ viewport: workflow.source.viewport });
-  let openAIRequests = 0;
+  const page = await browser.newPage({
+    viewport: workflow.source.viewport,
+    serviceWorkers: "block",
+  });
+  let blockedOpenAIRequests = 0;
   await page.route("**/*", async (route) => {
-    const host = new URL(route.request().url()).host;
-    if (host.includes("openai.com")) openAIRequests += 1;
+    const hostname = new URL(route.request().url()).hostname.toLowerCase();
+    if (hostname === "openai.com" || hostname.endsWith(".openai.com")) {
+      blockedOpenAIRequests += 1;
+      await route.abort("blockedbyclient");
+      return;
+    }
     await route.continue();
   });
+  await page.routeWebSocket(
+    (candidateUrl) => {
+      const hostname = candidateUrl.hostname.toLowerCase();
+      return hostname === "openai.com" || hostname.endsWith(".openai.com");
+    },
+    async (webSocket) => {
+      blockedOpenAIRequests += 1;
+      await webSocket.close({
+        code: 1008,
+        reason: "OpenAI network access is disabled at runtime.",
+      });
+    },
+  );
   const telemetry: RuntimeTelemetry = {
     startedAt: new Date().toISOString(),
     llmCalls: 0,
@@ -164,9 +184,11 @@ export async function runWorkflowObject(
   }
   telemetry.finishedAt = new Date().toISOString();
   telemetry.durationMs = Date.now() - started;
-  telemetry.openAIRequests = openAIRequests as 0;
-  if (openAIRequests !== 0)
-    throw new Error(`Runtime made ${openAIRequests} OpenAI network requests.`);
+  if (blockedOpenAIRequests !== 0) {
+    throw new Error(
+      `Runtime blocked ${blockedOpenAIRequests} attempted OpenAI network request(s).`,
+    );
+  }
   return telemetry;
 }
 

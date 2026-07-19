@@ -1,10 +1,16 @@
 import express from "express";
 import { renderDemoPage, type DemoVariant } from "./renderDemoPage.js";
 
-export function createDemoServer(port = Number(process.env.DEMO_PORT ?? 4173)) {
+export function createDemoServer(
+  port = Number(process.env.DEMO_PORT ?? 4173),
+  host = process.env.DEMO_HOST ?? "0.0.0.0",
+) {
   const app = express();
 
-  app.get("/health", (_req, res) => res.json({ ok: true }));
+  app.disable("x-powered-by");
+  app.get("/health", (_req, res) =>
+    res.json({ ok: true, status: "healthy", service: "demo-site" }),
+  );
   app.get("/", (req, res) => {
     const variant = req.query.variant === "B" ? "B" : "A";
     res.redirect(`/demo?variant=${variant}`);
@@ -14,10 +20,8 @@ export function createDemoServer(port = Number(process.env.DEMO_PORT ?? 4173)) {
     res.type("html").send(renderDemoPage(variant));
   });
 
-  const server = app.listen(port, () => {
-    console.log(
-      `Demo site listening on http://127.0.0.1:${port}/demo?variant=A`,
-    );
+  const server = app.listen(port, host, () => {
+    console.log(`Demo site listening on http://${host}:${port}/demo?variant=A`);
   });
 
   return { app, server };
